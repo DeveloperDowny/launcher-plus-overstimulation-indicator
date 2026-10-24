@@ -246,7 +246,7 @@ async function start(id) {
 }
 
 function normId(s) { // tolerate full-width chars, zero-width chars, stray spaces, caps
-  return String(s || "").normalize("NFKC").replace(/[​-‍﻿\s]/g, "").toLowerCase();
+  return String(s || "").normalize("NFKC").replace(new RegExp("[" + String.fromCharCode(0x200b) + "-" + String.fromCharCode(0x200d) + String.fromCharCode(0xfeff) + "\\s]", "g"), "").toLowerCase();
 }
 function go() {
   const err = $("loginErr");
