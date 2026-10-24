@@ -10,6 +10,7 @@
           --calm:#16a34a; --steady:#0891b2; --loaded:#d97706; --frayed:#dc2626; }
   @media (prefers-color-scheme: dark) {
     :root { --bg:#0f1115; --card:#1a1d24; --text:#f3f4f6; --muted:#9ca3af; --line:#2a2e38; --accent:#818cf8; } }
+  [hidden] { display:none !important; }
   * { box-sizing:border-box; }
   body { margin:0; font:16px/1.4 system-ui,sans-serif; background:var(--bg); color:var(--text); }
   main { max-width:560px; margin:0 auto; padding:16px; }
@@ -19,7 +20,10 @@
   button.ghost { background:transparent; color:var(--accent); border:1px solid var(--line); padding:6px 10px; font-size:14px; }
   button.row { width:100%; }
   input[type=text], textarea { width:100%; font:inherit; padding:10px; border-radius:10px; border:1px solid var(--line);
-          background:var(--bg); color:var(--text); }
+          background:var(--bg); color:var(--text); -webkit-text-fill-color:var(--text); caret-color:var(--accent);
+          -webkit-user-select:text; user-select:text; pointer-events:auto; position:relative; z-index:1; }
+  input[type=text]::placeholder, textarea::placeholder { color:var(--muted); -webkit-text-fill-color:var(--muted); opacity:1; }
+  input[type=text]:focus, textarea:focus { outline:2px solid var(--accent); outline-offset:1px; }
   input[type=range] { width:100%; }
   .bar { height:18px; background:var(--line); border-radius:9px; overflow:hidden; margin:10px 0; }
   .bar > div { height:100%; width:0; transition:width .3s, background .3s; }
@@ -28,19 +32,27 @@
   .flex { display:flex; gap:8px; align-items:center; justify-content:space-between; }
   .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
   #toast { position:fixed; left:16px; right:16px; bottom:16px; max-width:528px; margin:0 auto; background:#111827; color:#fff;
-           padding:12px 14px; border-radius:12px; display:none; z-index:9; }
+           padding:12px 14px; border-radius:12px; display:none; z-index:9; pointer-events:none; }
+  #diag { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; border-radius:10px; padding:10px 12px; margin-bottom:10px; font-size:14px; }
   #login .card { margin-top:20vh; }
 </style>
 </head>
 <body>
 <main>
-  <section id="login" hidden>
+  <div id="diag" role="alert" hidden></div>
+  <noscript><div class="card">This app needs JavaScript enabled.</div></noscript>
+
+  <section id="login">
     <div class="card">
       <h1 style="margin-top:0">Overstimulation Launcher</h1>
       <p class="muted">Enter your tester ID to start. Each app you open adds to an estimate of how overstimulated you are; you can correct it any time.</p>
-      <input type="text" id="uid" placeholder="e.g. tester01" autocapitalize="none" autocomplete="off">
-      <p id="loginErr" class="muted" style="color:var(--frayed)"></p>
-      <button class="row" id="loginBtn">Start</button>
+      <form id="loginForm" autocomplete="off" novalidate>
+        <label for="uid" class="muted" style="display:block;margin-bottom:6px">Tester ID</label>
+        <input type="text" id="uid" name="tester-id" placeholder="e.g. tester01" autocomplete="off" autocapitalize="none"
+               autocorrect="off" spellcheck="false" inputmode="text" enterkeyhint="go" autofocus>
+        <p id="loginErr" class="muted" style="color:var(--frayed)"></p>
+        <button class="row" id="loginBtn" type="submit">Start</button>
+      </form>
       <p class="muted" style="text-align:center"><a href="help.html" style="color:var(--accent)">Help &amp; how it works</a></p>
     </div>
   </section>
