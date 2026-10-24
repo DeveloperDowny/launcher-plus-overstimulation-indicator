@@ -3,7 +3,9 @@
 Weights are 1-10: how strongly the activity overstimulates a highly sensitive
 person (Aron, *The Highly Sensitive Person*: sensory intensity, emotional
 processing depth, social pressure, and interruption all raise arousal).
-Edit freely - this file is the single source of truth.
+Negative weights are calming activities: they lower the level instead of raising it.
+Edit freely - this file is the single source of truth. After editing, run
+`python inventory.py` to regenerate web/inventory.json for the web app.
 """
 
 # id -> (label, weight, mode keywords)
@@ -23,6 +25,22 @@ ACTIVITIES = {
     "work_messages":  ("Checking messages while working/studying", 6, ["working", "work", "study", "studying"]),
     "ai_chat":        ("AI chat across unrelated topics", 5, ["ask", "ai"]),
     "long_articles":  ("Long, information-dense articles", 4, ["read", "article", "articles", "paper", "papers"]),
+    # --- calming activities (negative weight = recovery) ---
+    "breathing":      ("Guided breathing", -4, ["breathe", "breathing"]),
+    "meditation":     ("Guided meditation / body scan", -4, ["meditate", "meditation", "bodyscan"]),
+    "calm_music":     ("Calming instrumental music", -3, ["music", "calm", "instrumental"]),
+    "nature_sounds":  ("Nature sounds", -3, ["nature", "sounds"]),
+    "relaxation":     ("Guided relaxation exercise", -3, ["relax", "relaxation"]),
+    "brain_dump":     ("Brain dump in a notes app", -3, ["dump", "braindump", "notes"]),
+    "journaling":     ("Journaling / gratitude reflection", -3, ["journal", "journaling", "gratitude"]),
+    "stretching":     ("Gentle stretching / yoga", -3, ["stretch", "stretching", "yoga"]),
+    "sleep_audio":    ("Sleep story / bedtime audio", -3, ["sleepstory", "story"]),
+    "calm_reading":   ("Familiar book, calming fiction or poetry", -2, ["fiction", "poetry", "novel", "calmread"]),
+    "audiobook":      ("Familiar audiobook", -2, ["audiobook", "listen"]),
+    "mood_checkin":   ("Simple mood check-in", -2, ["mood", "checkin"]),
+    "nature_visuals": ("Calming nature photos / slow nature video", -2, ["photos", "scenery", "slow"]),
+    "screen_timer":   ("Timer for a screen break / sitting quietly", -2, ["timer", "quiet", "sit"]),
+    "trusted_msg":    ("One message to a trusted person", -2, ["trusted", "friend"]),
 }
 
 # app key -> (aliases typed by user, url, default activity, [activities it supports])
@@ -30,11 +48,12 @@ APPS = {
     "instagram": (["instagram", "insta", "ig"], "https://www.instagram.com/", "social_profiles",
                   ["short_videos", "social_profiles", "notifications", "intense_convo", "loud_video", "after_busy_day", "before_sleep", "app_switching"]),
     "youtube": (["youtube", "yt"], "https://www.youtube.com/", "loud_video",
-                ["short_videos", "loud_video", "after_busy_day", "before_sleep", "app_switching"]),
+                ["short_videos", "loud_video", "after_busy_day", "before_sleep", "app_switching",
+                 "nature_sounds", "nature_visuals", "relaxation", "stretching", "meditation", "calm_music"]),
     "tiktok": (["tiktok"], "https://www.tiktok.com/", "short_videos", ["short_videos", "loud_video"]),
     "snapchat": (["snapchat", "snap"], "https://www.snapchat.com/spotlight", "short_videos", ["short_videos"]),
     "whatsapp": (["whatsapp", "wa"], "https://web.whatsapp.com/", "group_chats",
-                 ["group_chats", "intense_convo", "notifications", "work_messages", "before_sleep", "app_switching"]),
+                 ["group_chats", "intense_convo", "notifications", "work_messages", "before_sleep", "app_switching", "trusted_msg"]),
     "gmail": (["gmail", "email", "mail"], "https://mail.google.com/", "notifications", ["notifications", "work_messages"]),
     "slack": (["slack"], "https://app.slack.com/", "work_messages", ["notifications", "group_chats", "work_messages"]),
     "teams": (["microsoft teams", "teams", "ms teams"], "https://teams.microsoft.com/", "work_messages",
@@ -66,12 +85,44 @@ APPS = {
     "substack": (["substack"], "https://substack.com/", "long_articles", ["long_articles"]),
     "wikipedia": (["wikipedia", "wiki"], "https://www.wikipedia.org/", "long_articles", ["long_articles"]),
     "scholar": (["google scholar", "scholar"], "https://scholar.google.com/", "long_articles", ["long_articles"]),
-    "kindle": (["kindle"], "https://read.amazon.com/", "long_articles", ["long_articles", "before_sleep"]),
+    "kindle": (["kindle"], "https://read.amazon.com/", "long_articles", ["long_articles", "before_sleep", "calm_reading"]),
     "amazon": (["amazon"], "https://www.amazon.in/", "shopping", ["shopping"]),
     "flipkart": (["flipkart"], "https://www.flipkart.com/", "shopping", ["shopping"]),
     "myntra": (["myntra"], "https://www.myntra.com/", "shopping", ["shopping"]),
     "ajio": (["ajio"], "https://www.ajio.com/", "shopping", ["shopping"]),
     "pinterest": (["pinterest"], "https://www.pinterest.com/", "shopping", ["shopping"]),
+    # --- calming apps / sites ---
+    "spotify": (["spotify"], "https://open.spotify.com/", "calm_music", ["calm_music", "nature_sounds", "audiobook", "sleep_audio"]),
+    "youtube music": (["youtube music", "ytmusic"], "https://music.youtube.com/", "calm_music", ["calm_music", "nature_sounds"]),
+    "apple music": (["apple music"], "https://music.apple.com/", "calm_music", ["calm_music"]),
+    "calm": (["calm app", "calm.com"], "https://www.calm.com/", "relaxation", ["relaxation", "breathing", "meditation", "nature_sounds", "sleep_audio"]),
+    "headspace": (["headspace"], "https://www.headspace.com/", "meditation", ["meditation", "breathing", "relaxation", "sleep_audio"]),
+    "medito": (["medito"], "https://meditofoundation.org/", "meditation", ["meditation", "breathing"]),
+    "insight timer": (["insight timer", "insighttimer"], "https://insighttimer.com/", "meditation", ["meditation", "relaxation"]),
+    "mynoise": (["mynoise"], "https://mynoise.net/", "nature_sounds", ["nature_sounds"]),
+    "breathwrk": (["breathwrk"], "https://breathwrk.com/", "breathing", ["breathing"]),
+    "ucla mindful": (["ucla mindful", "ucla"], "https://www.uclahealth.org/programs/marc/free-guided-meditations", "meditation", ["meditation"]),
+    "libby": (["libby"], "https://libbyapp.com/", "calm_reading", ["calm_reading", "audiobook"]),
+    "google play books": (["google play books", "play books"], "https://play.google.com/store/books", "calm_reading", ["calm_reading", "audiobook"]),
+    "poetry foundation": (["poetry foundation", "poetry"], "https://www.poetryfoundation.org/", "calm_reading", ["calm_reading"]),
+    "audible": (["audible"], "https://www.audible.in/", "audiobook", ["audiobook", "sleep_audio"]),
+    "storytel": (["storytel"], "https://www.storytel.com/", "audiobook", ["audiobook"]),
+    "google keep": (["google keep", "keep"], "https://keep.google.com/", "brain_dump", ["brain_dump", "journaling"]),
+    "simplenote": (["simplenote"], "https://app.simplenote.com/", "brain_dump", ["brain_dump", "journaling"]),
+    "notion": (["notion"], "https://www.notion.so/", "brain_dump", ["brain_dump", "journaling"]),
+    "day one": (["day one", "dayone"], "https://dayoneapp.com/", "journaling", ["journaling"]),
+    "daylio": (["daylio"], "https://daylio.net/", "mood_checkin", ["mood_checkin"]),
+    "bearable": (["bearable"], "https://bearable.app/", "mood_checkin", ["mood_checkin"]),
+    "how we feel": (["how we feel", "howwefeel"], "https://howwefeel.org/", "mood_checkin", ["mood_checkin"]),
+    "unsplash": (["unsplash"], "https://unsplash.com/s/photos/nature", "nature_visuals", ["nature_visuals"]),
+    "google photos": (["google photos"], "https://photos.google.com/", "nature_visuals", ["nature_visuals"]),
+    "bbc earth": (["bbc earth"], "https://www.bbcearth.com/", "nature_visuals", ["nature_visuals"]),
+    "alltrails": (["alltrails"], "https://www.alltrails.com/", "nature_visuals", ["nature_visuals"]),
+    "down dog": (["down dog", "downdog"], "https://www.downdogapp.com/", "stretching", ["stretching"]),
+    "yoga with adriene": (["yoga with adriene", "adriene"], "https://yogawithadriene.com/", "stretching", ["stretching"]),
+    "timer": (["timer", "google timer"], "https://www.google.com/search?q=timer", "screen_timer", ["screen_timer"]),
+    "forest": (["forest"], "https://www.forestapp.cc/", "screen_timer", ["screen_timer"]),
+    "signal": (["signal"], "https://signal.org/", "trusted_msg", ["trusted_msg"]),
 }
 
 # (app, activity) -> specific URL, when it differs from the app's home page
@@ -80,4 +131,24 @@ URL_OVERRIDES = {
     ("instagram", "intense_convo"): "https://www.instagram.com/direct/inbox/",
     ("youtube", "short_videos"): "https://www.youtube.com/shorts",
     ("reddit", "news"): "https://www.reddit.com/r/news/",
+    ("youtube", "nature_sounds"): "https://www.youtube.com/results?search_query=nature+sounds+relaxing",
+    ("youtube", "nature_visuals"): "https://www.youtube.com/results?search_query=slow+nature+scenery+no+talking",
+    ("youtube", "relaxation"): "https://www.youtube.com/results?search_query=guided+relaxation",
+    ("youtube", "stretching"): "https://www.youtube.com/results?search_query=gentle+stretching+yoga",
+    ("youtube", "meditation"): "https://www.youtube.com/results?search_query=guided+meditation+body+scan",
+    ("youtube", "calm_music"): "https://www.youtube.com/results?search_query=calming+instrumental+music",
+    ("spotify", "nature_sounds"): "https://open.spotify.com/search/nature%20sounds",
+    ("spotify", "sleep_audio"): "https://open.spotify.com/search/sleep%20stories",
 }
+
+
+if __name__ == "__main__":  # regenerate web/inventory.json
+    import json
+    from pathlib import Path
+    out = {
+        "activities": {k: {"label": l, "weight": w, "modes": m} for k, (l, w, m) in ACTIVITIES.items()},
+        "apps": {k: {"aliases": a, "url": u, "default": d, "supports": sup} for k, (a, u, d, sup) in APPS.items()},
+        "urlOverrides": {f"{a}|{b}": u for (a, b), u in URL_OVERRIDES.items()},
+    }
+    Path(__file__).with_name("web").joinpath("inventory.json").write_text(json.dumps(out), encoding="utf-8")
+    print(f"wrote {len(out['activities'])} activities, {len(out['apps'])} apps")

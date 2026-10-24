@@ -166,10 +166,11 @@ def do_open(s: dict, text: str) -> None:
     t = now()
     cutoff = t - timedelta(minutes=SWITCH_WINDOW_MIN)
     s["recent"] = [r for r in s.get("recent", []) if datetime.fromisoformat(r[0]) >= cutoff]
-    s["recent"].append([t.isoformat(), app_key])
     points = weight * POINTS_PER_WEIGHT
     note = ""
-    if len({r[1] for r in s["recent"]}) >= SWITCH_APPS:
+    if weight > 0:  # calming launches (negative weight) neither count as switching nor trigger the penalty
+        s["recent"].append([t.isoformat(), app_key])
+    if weight > 0 and len({r[1] for r in s["recent"]}) >= SWITCH_APPS:
         sw = ACTIVITIES["app_switching"][1] * POINTS_PER_WEIGHT
         points += sw
         note = f" (+{sw:.0f} app-switching penalty)"
@@ -177,11 +178,11 @@ def do_open(s: dict, text: str) -> None:
     url = URL_OVERRIDES.get((app_key, act_id), APPS[app_key][1])
     webbrowser.open(url)
 
-    s["level"] = min(100.0, level_before + points)
+    s["level"] = max(0.0, min(100.0, level_before + points))
     log("open", s, level_before, s["level"], command=text, app=app_key, activity=act_id,
         activity_label=label, weight=weight, points_added=round(points, 1),
         switch_penalty=round(points - weight * POINTS_PER_WEIGHT, 1), url=url)
-    typer.echo(f"Opening {app_key}: {label} (weight {weight}) +{points:.0f}%{note}")
+    typer.echo(f"Opening {app_key}: {label} (weight {weight}) {points:+.0f}%{note}")
     typer.echo(f"Level now:\n  {status_line(s['level'], s)}")
 
 

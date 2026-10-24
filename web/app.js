@@ -114,14 +114,14 @@ function openApp(appKey, actId) {
   const before = settle();
   const now = Date.now();
   S.recent = S.recent.filter((r) => r[0] >= now - SWITCH_WINDOW_MIN * MIN);
-  S.recent.push([now, appKey]);
+  if (act.weight > 0) S.recent.push([now, appKey]); // calming launches don't count as switching
   let points = act.weight * POINTS_PER_WEIGHT;
-  if (new Set(S.recent.map((r) => r[1])).size >= SWITCH_APPS) points += INV.activities.app_switching.weight * POINTS_PER_WEIGHT;
-  S.level = Math.min(100, before + points);
+  if (act.weight > 0 && new Set(S.recent.map((r) => r[1])).size >= SWITCH_APPS) points += INV.activities.app_switching.weight * POINTS_PER_WEIGHT;
+  S.level = Math.max(0, Math.min(100, before + points));
   const penalty = points - act.weight * POINTS_PER_WEIGHT;
   log("open", before, S.level, { command: `${appKey} ${actId}`, app: appKey, activity: actId, activity_label: act.label,
     weight: act.weight, points_added: +points.toFixed(1), switch_penalty: +penalty.toFixed(1), url });
-  toast(`${appKey}: +${Math.round(points)}%${penalty ? " (app-switching penalty)" : ""}`);
+  toast(`${appKey}: ${points > 0 ? "+" : ""}${Math.round(points)}%${penalty ? " (app-switching penalty)" : ""}`);
   done();
 }
 
