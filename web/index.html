@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1f2937">
+<title>Overstimulation Launcher</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --text:#111827; --muted:#6b7280; --line:#e5e7eb; --accent:#4f46e5;
+          --calm:#16a34a; --steady:#0891b2; --loaded:#d97706; --frayed:#dc2626; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0f1115; --card:#1a1d24; --text:#f3f4f6; --muted:#9ca3af; --line:#2a2e38; --accent:#818cf8; } }
+  * { box-sizing:border-box; }
+  body { margin:0; font:16px/1.4 system-ui,sans-serif; background:var(--bg); color:var(--text); }
+  main { max-width:560px; margin:0 auto; padding:16px; }
+  h2 { font-size:15px; margin:24px 0 8px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:10px; }
+  button { font:inherit; border:0; border-radius:10px; padding:10px 14px; background:var(--accent); color:#fff; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--accent); border:1px solid var(--line); padding:6px 10px; font-size:14px; }
+  button.row { width:100%; }
+  input[type=text], textarea { width:100%; font:inherit; padding:10px; border-radius:10px; border:1px solid var(--line);
+          background:var(--bg); color:var(--text); }
+  input[type=range] { width:100%; }
+  .bar { height:18px; background:var(--line); border-radius:9px; overflow:hidden; margin:10px 0; }
+  .bar > div { height:100%; width:0; transition:width .3s, background .3s; }
+  .big { font-size:40px; font-weight:700; }
+  .muted { color:var(--muted); font-size:14px; }
+  .flex { display:flex; gap:8px; align-items:center; justify-content:space-between; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  #toast { position:fixed; left:16px; right:16px; bottom:16px; max-width:528px; margin:0 auto; background:#111827; color:#fff;
+           padding:12px 14px; border-radius:12px; display:none; z-index:9; }
+  #login .card { margin-top:20vh; }
+</style>
+</head>
+<body>
+<main>
+  <section id="login" hidden>
+    <div class="card">
+      <h1 style="margin-top:0">Overstimulation Launcher</h1>
+      <p class="muted">Enter your tester ID to start. Each app you open adds to an estimate of how overstimulated you are; you can correct it any time.</p>
+      <input type="text" id="uid" placeholder="e.g. tester01" autocapitalize="none" autocomplete="off">
+      <p id="loginErr" class="muted" style="color:var(--frayed)"></p>
+      <button class="row" id="loginBtn">Start</button>
+      <p class="muted" style="text-align:center"><a href="help.html" style="color:var(--accent)">Help &amp; how it works</a></p>
+    </div>
+  </section>
+
+  <section id="appview" hidden>
+    <div class="flex"><strong id="who"></strong><span><a href="help.html" style="color:var(--accent);margin-right:12px">Help</a><button class="ghost" id="logout">Switch ID</button></span></div>
+
+    <h2>Your level</h2>
+    <div class="card">
+      <div class="big"><span id="pct">0</span>% <span id="band" style="font-size:20px"></span></div>
+      <div class="bar"><div id="fill"></div></div>
+      <div id="comment"></div>
+      <div class="muted" id="since"></div>
+    </div>
+
+    <h2>How do you feel right now?</h2>
+    <div class="card">
+      <div class="flex"><span class="muted">0%</span><strong><span id="feelVal">50</span>% overstimulated</strong><span class="muted">100%</span></div>
+      <input type="range" id="feel" min="0" max="100" value="50">
+      <button class="row" id="feelBtn" style="margin-top:8px">Set my level</button>
+      <div id="accBox" hidden style="margin-top:10px">
+        <div class="muted" id="accQ"></div>
+        <div class="chips"><button class="ghost" data-acc="1">Close enough</button><button class="ghost" data-acc="0">Way off</button></div>
+      </div>
+    </div>
+
+    <button class="row" id="breakBtn" style="background:var(--calm)">Take a break</button>
+
+    <h2>Launch</h2>
+    <input type="text" id="search" placeholder="Search apps…" autocomplete="off">
+    <div id="apps" style="margin-top:10px"></div>
+
+    <h2>Feedback</h2>
+    <div class="card">
+      <textarea id="fbText" rows="3" placeholder="What's useful, confusing, or missing?"></textarea>
+      <button class="row" id="fbBtn" style="margin-top:8px">Send feedback</button>
+    </div>
+  </section>
+</main>
+<div id="toast"></div>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

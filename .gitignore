@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+# personal usage data
+log.txt
+state.json
+.env
