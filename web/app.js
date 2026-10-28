@@ -139,10 +139,27 @@ function maybeAutoBreak() {
 }
 function done() { S.lastCmdAt = Date.now(); render(); }
 
+// crossing into the frayed band: copy the calming list and open the roulette site.
+// Runs inside the tap, so the clipboard write is allowed; a second popup may still be
+// blocked, which is why the level card also shows a roulette button while frayed.
+function copyRouletteList() {
+  const text = INV && INV.roulette && INV.roulette.clipboard;
+  if (!text) return;
+  try { navigator.clipboard.writeText(text).then(() => toast("Lots of overstimulation: calming list copied, opening the roulette."),
+    () => toast("Lots of overstimulation: opening the roulette (couldn't copy the list).")); } catch {}
+}
+function openRoulette() {
+  copyRouletteList();
+  if (INV && INV.roulette) window.open(INV.roulette.url, "_blank", "noopener");
+}
+function maybeRoulette(before, after) {
+  if (bandOf(before)[1] !== "frayed" && bandOf(after)[1] === "frayed") openRoulette();
+}
+
 function openApp(appKey, actId) {
   const a = INV.apps[appKey], act = INV.activities[actId];
   const url = INV.urlOverrides[`${appKey}|${actId}`] || a.url;
-  window.open(url, "_blank", "noopener"); // must happen synchronously inside the tap
+  if (url) window.open(url, "_blank", "noopener"); // must happen synchronously inside the tap; dummy launches have no url
   maybeAutoBreak();
   const before = settle();
   const now = Date.now();
@@ -156,6 +173,7 @@ function openApp(appKey, actId) {
     weight: act.weight, points_added: +points.toFixed(1), switch_penalty: +penalty.toFixed(1), url });
   toast(`${appKey}: ${points > 0 ? "+" : ""}${Math.round(points)}%${penalty ? " (app-switching penalty)" : ""}`);
   done();
+  maybeRoulette(before, S.level);
 }
 
 function takeBreak() {
@@ -178,6 +196,7 @@ function setFeel() {
   $("accQ").textContent = `The app estimated ${lastFeel.computed}% and you said ${v}%. Was the estimate:`;
   $("accBox").hidden = false;
   done();
+  maybeRoulette(before, v);
 }
 function sendAccuracy(ok) {
   sbPost("feedback", { user_id: userId, kind: "accuracy", accurate: ok, felt: lastFeel.felt, computed_level: lastFeel.computed });
@@ -203,6 +222,7 @@ function render() {
   $("band").textContent = name.toUpperCase(); $("band").style.color = color;
   $("fill").style.width = l + "%"; $("fill").style.background = color;
   $("comment").textContent = comment;
+  $("rouletteBtn").hidden = name !== "frayed";
   $("since").textContent = S.lastBreakAt ? `${minsSinceBreak()} min since last break`
     : `No break yet (${minsSinceBreak()} min since you started)`;
 }
@@ -222,7 +242,7 @@ function renderApps() {
       const act = INV.activities[actId];
       const b = document.createElement("button");
       b.className = actId === a.default ? "" : "ghost";
-      b.textContent = actId === a.default ? `Open ${key}` : `${act.modes[0] || act.label} (${act.weight})`;
+      b.textContent = actId === a.default ? `${a.url ? "Open" : "Log"} ${key}` : `${act.modes[0] || act.label} (${act.weight})`;
       b.onclick = () => openApp(key, actId);
       chips.appendChild(b);
     }
@@ -263,6 +283,7 @@ function wire() {
   $("uid").addEventListener("input", () => { $("loginErr").textContent = ""; });
   $("search").oninput = renderApps;
   $("feel").oninput = () => ($("feelVal").textContent = $("feel").value);
+  $("rouletteBtn").onclick = openRoulette;
   $("feelBtn").onclick = setFeel; $("breakBtn").onclick = takeBreak; $("fbBtn").onclick = sendText;
   document.querySelectorAll("[data-acc]").forEach((b) => (b.onclick = () => sendAccuracy(b.dataset.acc === "1")));
   $("logout").onclick = () => { store.del("uid"); location.reload(); };

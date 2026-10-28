@@ -4,6 +4,7 @@ Weights are 1-10: how strongly the activity overstimulates a highly sensitive
 person (Aron, *The Highly Sensitive Person*: sensory intensity, emotional
 processing depth, social pressure, and interruption all raise arousal).
 Negative weights are calming activities: they lower the level instead of raising it.
+Weight 0 is neutral: logged, but the level doesn't move.
 Edit freely - this file is the single source of truth. After editing, run
 `python inventory.py` to regenerate web/inventory.json for the web app.
 """
@@ -41,7 +42,25 @@ ACTIVITIES = {
     "nature_visuals": ("Calming nature photos / slow nature video", -2, ["photos", "scenery", "slow"]),
     "screen_timer":   ("Timer for a screen break / sitting quietly", -2, ["timer", "quiet", "sit"]),
     "trusted_msg":    ("One message to a trusted person", -2, ["trusted", "friend"]),
+    # --- neutral (weight 0: logged only, level unchanged) ---
+    "going_to_sleep": ("Going to sleep", 0, ["bed", "gotosleep"]),
+    "back_to_work":   ("Going back to work", 0, ["backtowork", "resume"]),
+    "roulette":       ("Spin the calming-activity roulette", 0, ["spin", "roulette"]),
 }
+
+# when a launch or "feel" pushes the level into the frayed band, this list is
+# copied to the clipboard and the roulette site is opened
+ROULETTE_URL = "https://roulette-s-v1.el.r.appspot.com/"
+ROULETTE_CLIPBOARD = """Visualize your comfort place for 1 min, 1
+Count breaths 1 set, 1
+Count breaths 2 set, 1
+One headspace session, 1
+One headspace podcast, 1
+One headspace sleep sound, 1
+Reading any book 3 pages, 1
+Reading book 10 pages, 1
+Reading boom 10 minutes, 1
+Gently bring attention to current task, 1"""
 
 # app key -> (aliases typed by user, url, default activity, [activities it supports])
 APPS = {
@@ -123,6 +142,10 @@ APPS = {
     "timer": (["timer", "google timer"], "https://www.google.com/search?q=timer", "screen_timer", ["screen_timer"]),
     "forest": (["forest"], "https://www.forestapp.cc/", "screen_timer", ["screen_timer"]),
     "signal": (["signal"], "https://signal.org/", "trusted_msg", ["trusted_msg"]),
+    "roulette": (["roulette"], ROULETTE_URL, "roulette", ["roulette"]),
+    # --- dummy launches (no url: nothing opens, the event is just logged) ---
+    "sleep": (["going to sleep", "go to sleep", "sleep", "bed"], "", "going_to_sleep", ["going_to_sleep"]),
+    "back to work": (["going back to work", "back to work", "work"], "", "back_to_work", ["back_to_work"]),
 }
 
 # (app, activity) -> specific URL, when it differs from the app's home page
@@ -149,6 +172,7 @@ if __name__ == "__main__":  # regenerate web/inventory.json
         "activities": {k: {"label": l, "weight": w, "modes": m} for k, (l, w, m) in ACTIVITIES.items()},
         "apps": {k: {"aliases": a, "url": u, "default": d, "supports": sup} for k, (a, u, d, sup) in APPS.items()},
         "urlOverrides": {f"{a}|{b}": u for (a, b), u in URL_OVERRIDES.items()},
+        "roulette": {"url": ROULETTE_URL, "clipboard": ROULETTE_CLIPBOARD},
     }
     Path(__file__).with_name("web").joinpath("inventory.json").write_text(json.dumps(out), encoding="utf-8")
     print(f"wrote {len(out['activities'])} activities, {len(out['apps'])} apps")

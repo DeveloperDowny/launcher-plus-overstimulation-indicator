@@ -6,6 +6,8 @@ Run:  python launcher.py          (interactive prompt)
 Commands: open <app> [mode] | show level | take break | feel <0-100> | apps | help | quit
 """
 import json
+import shutil
+import subprocess
 import sys
 import webbrowser
 from datetime import datetime, timedelta
@@ -14,7 +16,7 @@ from typing import List, Optional
 
 import typer
 
-from inventory import ACTIVITIES, APPS, URL_OVERRIDES
+from inventory import ACTIVITIES, APPS, ROULETTE_CLIPBOARD, ROULETTE_URL, URL_OVERRIDES
 
 HERE = Path(__file__).parent
 LOG_FILE = HERE / "log.txt"
@@ -119,6 +121,29 @@ def status_line(level: float, s: dict) -> str:
     return f"{head} - {comment}\n  {since_break(s)}"
 
 
+# --- overstimulation response ---------------------------------------------
+def copy_to_clipboard(text: str) -> bool:
+    """Best effort, no extra dependency: the OS clipboard tool if one is installed."""
+    for cmd in (["clip"], ["pbcopy"], ["wl-copy"], ["xclip", "-selection", "clipboard"], ["xsel", "-ib"]):
+        if shutil.which(cmd[0]):
+            try:
+                subprocess.run(cmd, input=text.encode(), check=True)
+                return True
+            except (OSError, subprocess.CalledProcessError):
+                pass
+    return False
+
+
+def maybe_roulette(before: float, after: float) -> None:
+    """Crossing into the frayed band: copy the calming list and open the roulette site."""
+    if band(before)[1] == "frayed" or band(after)[1] != "frayed":
+        return
+    copied = copy_to_clipboard(ROULETTE_CLIPBOARD)
+    webbrowser.open(ROULETTE_URL)
+    typer.echo(typer.style("Lots of overstimulation. Opening the roulette", fg="red", bold=True)
+               + (" (activity list copied to clipboard)." if copied else "; couldn't copy, paste this list:\n" + ROULETTE_CLIPBOARD))
+
+
 # --- command parsing -------------------------------------------------------
 def find_app(text: str):
     """Longest alias that prefixes `text` (word-boundary). Returns (app_key, rest)."""
@@ -176,14 +201,16 @@ def do_open(s: dict, text: str) -> None:
         note = f" (+{sw:.0f} app-switching penalty)"
 
     url = URL_OVERRIDES.get((app_key, act_id), APPS[app_key][1])
-    webbrowser.open(url)
+    if url:  # dummy launches (sleep, back to work) have no url and only log
+        webbrowser.open(url)
 
     s["level"] = max(0.0, min(100.0, level_before + points))
     log("open", s, level_before, s["level"], command=text, app=app_key, activity=act_id,
         activity_label=label, weight=weight, points_added=round(points, 1),
         switch_penalty=round(points - weight * POINTS_PER_WEIGHT, 1), url=url)
-    typer.echo(f"Opening {app_key}: {label} (weight {weight}) {points:+.0f}%{note}")
+    typer.echo(f"{'Opening' if url else 'Logged'} {app_key}: {label} (weight {weight}) {points:+.0f}%{note}")
     typer.echo(f"Level now:\n  {status_line(s['level'], s)}")
+    maybe_roulette(level_before, s["level"])
 
 
 def do_show(s: dict) -> None:
@@ -212,6 +239,7 @@ def do_feel(s: dict, arg: str) -> None:
     s["level"] = v
     log("feel", s, before, v, command="feel", felt=v, computed_level=round(before))
     typer.echo(f"Anchored. (computed was {before:.0f}%)\n  {status_line(v, s)}")
+    maybe_roulette(before, v)
 
 
 def maybe_auto_break(s: dict) -> None:

@@ -31,7 +31,7 @@
 
   <div class="card tldr">
     <strong>TL;DR</strong>
-    <p>This app estimates how overstimulated you are by adding up what you launch. Every app or activity has a weight (1&ndash;10) reflecting how strongly it tends to overstimulate a highly sensitive person, loosely following Elaine Aron's <em>The Highly Sensitive Person</em>. Each launch adds points; time passing and breaks bring the level down.</p>
+    <p>This app estimates how overstimulated you are by adding up what you launch. Every app or activity has a weight (usually 1&ndash;10) reflecting how strongly it tends to overstimulate a highly sensitive person, loosely following Elaine Aron's <em>The Highly Sensitive Person</em>. Each launch adds points; time passing and breaks bring the level down.</p>
     <p>Tap <strong>Set my level</strong> any time to say how you really feel, and the app re-anchors to your number. Bands: calm 0&ndash;25, steady 26&ndash;50, loaded 51&ndash;75, frayed 76&ndash;100.</p>
     <p>It only knows what you launch <em>here</em>, not what you do inside an app, so treat the number as a rough estimate, not medical advice. Everything you tap is logged under your tester ID so the creator can learn from it. Please don't put personal details in feedback.</p>
   </div>
@@ -48,6 +48,8 @@
   <div class="card"><ul>
     <li><strong>Launch:</strong> adds weight &times; 1.5 points (a weight-10 activity adds 15%).</li>
     <li><strong>Calming activities</strong> (breathing, meditation, calm music, nature sounds, journaling, stretching and similar) have negative weights, so launching them lowers the level instead. They never count towards app-switching. Calming isn't the same for everyone: if one of them feels like too much, skip it.</li>
+    <li><strong>Neutral launches</strong> (sleep, back to work, roulette) have weight 0: they are logged but don't change the level. Sleep and back to work don't open anything.</li>
+    <li><strong>Lots of overstimulation:</strong> when a launch or "Set my level" takes you into the frayed band (above 75), a list of calming activities is copied to your clipboard and the roulette site opens so you can spin for one. If your browser blocks the extra tab, use the red roulette button on your level card.</li>
     <li><strong>Time:</strong> the level drops 0.3 points per idle minute, slowly, because settling after stimulation takes a while.</li>
     <li><strong>Break:</strong> removes 60% of your current level. It does not reset to zero.</li>
     <li><strong>Auto-break:</strong> if more than 20 minutes pass between your actions, the next time you tap something the app records an inferred break (60% relief), dated to when the 20 minutes ran out. It cannot run in the background.</li>
