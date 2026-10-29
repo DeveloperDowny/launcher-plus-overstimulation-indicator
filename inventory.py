@@ -50,6 +50,7 @@ ACTIVITIES = {
     "breakfast":      ("Breakfast", 0, ["breakfast"]),
     "lunch":          ("Lunch", 0, ["lunch"]),
     "dinner":         ("Dinner", 0, ["dinner"]),
+    "habits_mental":  ("7 Habits: mental", 0, ["mental"]),
 }
 
 # when a launch or "feel" pushes the level into the frayed band, this list is
@@ -154,6 +155,7 @@ APPS = {
     "breakfast": (["breakfast"], "", "breakfast", ["breakfast"]),
     "lunch": (["lunch"], "", "lunch", ["lunch"]),
     "dinner": (["dinner"], "", "dinner", ["dinner"]),
+    "7-habits": (["7-habits", "7 habits", "seven habits"], "https://mental-roulette.vercel.app/", "habits_mental", ["habits_mental"]),
 }
 
 # (app, activity) -> specific URL, when it differs from the app's home page
