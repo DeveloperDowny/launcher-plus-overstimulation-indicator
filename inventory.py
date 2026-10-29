@@ -46,6 +46,10 @@ ACTIVITIES = {
     "going_to_sleep": ("Going to sleep", 0, ["bed", "gotosleep"]),
     "back_to_work":   ("Going back to work", 0, ["backtowork", "resume"]),
     "roulette":       ("Spin the calming-activity roulette", 0, ["spin", "roulette"]),
+    "gita_a_day":     ("Bhagwat Gita a Day", 0, ["gita", "verse"]),
+    "breakfast":      ("Breakfast", 0, ["breakfast"]),
+    "lunch":          ("Lunch", 0, ["lunch"]),
+    "dinner":         ("Dinner", 0, ["dinner"]),
 }
 
 # when a launch or "feel" pushes the level into the frayed band, this list is
@@ -146,6 +150,10 @@ APPS = {
     # --- dummy launches (no url: nothing opens, the event is just logged) ---
     "sleep": (["going to sleep", "go to sleep", "sleep", "bed"], "", "going_to_sleep", ["going_to_sleep"]),
     "back to work": (["going back to work", "back to work", "work"], "", "back_to_work", ["back_to_work"]),
+    "gita a day": (["bhagwat gita a day", "bhagavad gita a day", "bhagwat gita", "bhagavad gita", "gita a day", "gita"], "", "gita_a_day", ["gita_a_day"]),
+    "breakfast": (["breakfast"], "", "breakfast", ["breakfast"]),
+    "lunch": (["lunch"], "", "lunch", ["lunch"]),
+    "dinner": (["dinner"], "", "dinner", ["dinner"]),
 }
 
 # (app, activity) -> specific URL, when it differs from the app's home page
