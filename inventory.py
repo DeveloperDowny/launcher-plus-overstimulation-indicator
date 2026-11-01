@@ -26,6 +26,7 @@ ACTIVITIES = {
     "work_messages":  ("Checking messages while working/studying", 6, ["working", "work", "study", "studying"]),
     "ai_chat":        ("AI chat across unrelated topics", 5, ["ask", "ai"]),
     "long_articles":  ("Long, information-dense articles", 4, ["read", "article", "articles", "paper", "papers"]),
+    "utility_task":   ("Quick utility task (payments, rides, maps)", 1, ["pay", "ride", "navigate", "map", "maps"]),
     # --- calming activities (negative weight = recovery) ---
     "breathing":      ("Guided breathing", -4, ["breathe", "breathing"]),
     "meditation":     ("Guided meditation / body scan", -4, ["meditate", "meditation", "bodyscan"]),
@@ -147,6 +148,11 @@ APPS = {
     "timer": (["timer", "google timer"], "https://www.google.com/search?q=timer", "screen_timer", ["screen_timer"]),
     "forest": (["forest"], "https://www.forestapp.cc/", "screen_timer", ["screen_timer"]),
     "signal": (["signal"], "https://signal.org/", "trusted_msg", ["trusted_msg"]),
+    "gpay": (["google pay", "gpay"], "https://pay.google.com/", "utility_task", ["utility_task"]),
+    "phonepe": (["phonepe"], "https://www.phonepe.com/", "utility_task", ["utility_task"]),
+    "paytm": (["paytm"], "https://paytm.com/", "utility_task", ["utility_task"]),
+    "rapido": (["rapido"], "https://rapido.bike/", "utility_task", ["utility_task"]),
+    "google maps": (["google maps", "maps"], "https://www.google.com/maps", "utility_task", ["utility_task"]),
     "roulette": (["roulette"], ROULETTE_URL, "roulette", ["roulette"]),
     # --- dummy launches (no url: nothing opens, the event is just logged) ---
     "sleep": (["going to sleep", "go to sleep", "sleep", "bed"], "", "going_to_sleep", ["going_to_sleep"]),
