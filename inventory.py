@@ -43,6 +43,8 @@ ACTIVITIES = {
     "nature_visuals": ("Calming nature photos / slow nature video", -2, ["photos", "scenery", "slow"]),
     "screen_timer":   ("Timer for a screen break / sitting quietly", -2, ["timer", "quiet", "sit"]),
     "trusted_msg":    ("One message to a trusted person", -2, ["trusted", "friend"]),
+    "reading":        ("Reading a physical book", -2, ["reading", "book"]),
+    "reading_bedtime": ("Reading a physical book at bedtime", -3, ["bedtime", "night"]),
     # --- neutral (weight 0: logged only, level unchanged) ---
     "going_to_sleep": ("Going to sleep", 0, ["bed", "gotosleep"]),
     "back_to_work":   ("Going back to work", 0, ["backtowork", "resume"]),
@@ -148,6 +150,7 @@ APPS = {
     "timer": (["timer", "google timer"], "https://www.google.com/search?q=timer", "screen_timer", ["screen_timer"]),
     "forest": (["forest"], "https://www.forestapp.cc/", "screen_timer", ["screen_timer"]),
     "signal": (["signal"], "https://signal.org/", "trusted_msg", ["trusted_msg"]),
+    "reading": (["reading", "physical book", "book"], "", "reading", ["reading", "reading_bedtime"]),
     "gpay": (["google pay", "gpay"], "https://pay.google.com/", "utility_task", ["utility_task"]),
     "phonepe": (["phonepe"], "https://www.phonepe.com/", "utility_task", ["utility_task"]),
     "paytm": (["paytm"], "https://paytm.com/", "utility_task", ["utility_task"]),
