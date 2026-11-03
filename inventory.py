@@ -151,6 +151,8 @@ APPS = {
     "forest": (["forest"], "https://www.forestapp.cc/", "screen_timer", ["screen_timer"]),
     "signal": (["signal"], "https://signal.org/", "trusted_msg", ["trusted_msg"]),
     "reading": (["reading", "physical book", "book"], "", "reading", ["reading", "reading_bedtime"]),
+    "play store": (["google play store", "play store", "playstore"], "https://play.google.com/store/apps", "shopping", ["shopping"]),
+    "app store": (["apple app store", "app store", "appstore"], "https://apps.apple.com/", "shopping", ["shopping"]),
     "gpay": (["google pay", "gpay"], "https://pay.google.com/", "utility_task", ["utility_task"]),
     "phonepe": (["phonepe"], "https://www.phonepe.com/", "utility_task", ["utility_task"]),
     "paytm": (["paytm"], "https://paytm.com/", "utility_task", ["utility_task"]),
