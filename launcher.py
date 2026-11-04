@@ -30,6 +30,9 @@ BREAK_RELIEF = 0.6           # a break removes this fraction of current level
 SWITCH_WINDOW_MIN = 5        # >= SWITCH_APPS distinct apps within window -> switching penalty
 SWITCH_APPS = 3
 AUTO_BREAK_IDLE_MIN = 20     # idle gap before the next command that counts as an (inferred) break
+LATE_NIGHT_START = 22        # from 10 PM until LATE_NIGHT_END (local time) stimulating launches hit harder
+LATE_NIGHT_END = 5
+LATE_NIGHT_MULT = 1.5        # you're likely under-rested and should be heading to sleep
 
 BANDS = [(25, "calm", "Plenty of room. Go ahead."),
          (50, "steady", "Fine, but you're warming up."),
@@ -84,6 +87,10 @@ def log(event: str, s: dict, level_before: float, level_after: float, **extra) -
     }
     with LOG_FILE.open("a", encoding="utf-8") as f:
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+
+def late_night(t: datetime) -> bool:
+    return t.hour >= LATE_NIGHT_START or t.hour < LATE_NIGHT_END
 
 
 def decayed(s: dict) -> float:
@@ -195,6 +202,7 @@ def do_open(s: dict, text: str) -> None:
     cutoff = t - timedelta(minutes=SWITCH_WINDOW_MIN)
     s["recent"] = [r for r in s.get("recent", []) if datetime.fromisoformat(r[0]) >= cutoff]
     points = weight * POINTS_PER_WEIGHT
+    mult = LATE_NIGHT_MULT if weight > 0 and late_night(t) else 1.0  # calming/neutral launches are never boosted
     note = ""
     if weight > 0:  # calming launches (negative weight) neither count as switching nor trigger the penalty
         s["recent"].append([t.isoformat(), app_key])
@@ -202,6 +210,9 @@ def do_open(s: dict, text: str) -> None:
         sw = ACTIVITIES["app_switching"][1] * POINTS_PER_WEIGHT
         points += sw
         note = f" (+{sw:.0f} app-switching penalty)"
+    points *= mult
+    if mult > 1:
+        note += f" (x{mult:g} late night: prioritise sleep)"
 
     url = URL_OVERRIDES.get((app_key, act_id), APPS[app_key][1])
     if url:  # dummy launches (sleep, back to work) have no url and only log
@@ -213,7 +224,7 @@ def do_open(s: dict, text: str) -> None:
     doomscrolling = s["doom_streak"] > 0 and s["doom_streak"] % DOOMSCROLL_STREAK == 0
     log("open", s, level_before, s["level"], command=text, app=app_key, activity=act_id,
         activity_label=label, weight=weight, points_added=round(points, 1),
-        switch_penalty=round(points - weight * POINTS_PER_WEIGHT, 1), url=url,
+        switch_penalty=round(points / mult - weight * POINTS_PER_WEIGHT, 1), late_night_mult=mult, url=url,
         doom_streak=s["doom_streak"])
     typer.echo(f"{'Opening' if url else 'Logged'} {app_key}: {label} (weight {weight}) {points:+.0f}%{note}")
     typer.echo(f"Level now:\n  {status_line(s['level'], s)}")

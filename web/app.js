@@ -17,6 +17,8 @@ if (!window.CONFIG) diag("config.js failed to load. Reload the page; if it persi
 
 const POINTS_PER_WEIGHT = 1.5, DECAY_PER_MIN = 0.3, BREAK_RELIEF = 0.6;
 const SWITCH_WINDOW_MIN = 5, SWITCH_APPS = 3, AUTO_BREAK_IDLE_MIN = 20;
+const LATE_NIGHT_START = 22, LATE_NIGHT_END = 5, LATE_NIGHT_MULT = 1.5; // 10 PM-5 AM local: likely under-rested, prioritise sleep
+const lateNight = (d = new Date()) => d.getHours() >= LATE_NIGHT_START || d.getHours() < LATE_NIGHT_END;
 const BANDS = [[25, "calm", "Plenty of room. Go ahead."], [50, "steady", "Fine, but you're warming up."],
   [75, "loaded", "Getting heavy. A break would help."], [100, "frayed", "Overstimulated. Stop adding input; take a break."]];
 const MIN = 60000;
@@ -173,13 +175,15 @@ function openApp(appKey, actId) {
   if (act.weight > 0) S.recent.push([now, appKey]); // calming launches don't count as switching
   let points = act.weight * POINTS_PER_WEIGHT;
   if (act.weight > 0 && new Set(S.recent.map((r) => r[1])).size >= SWITCH_APPS) points += INV.activities.app_switching.weight * POINTS_PER_WEIGHT;
+  const mult = act.weight > 0 && lateNight() ? LATE_NIGHT_MULT : 1; // calming/neutral launches are never boosted
+  points *= mult;
   S.level = Math.max(0, Math.min(100, before + points));
   S.doomStreak = DOOM.activities.includes(actId) ? (S.doomStreak || 0) + 1 : 0; // any other launch restarts the count
   const doomscrolling = S.doomStreak > 0 && S.doomStreak % DOOM.streak === 0;
-  const penalty = points - act.weight * POINTS_PER_WEIGHT;
+  const penalty = points / mult - act.weight * POINTS_PER_WEIGHT;
   log("open", before, S.level, { command: `${appKey} ${actId}`, app: appKey, activity: actId, activity_label: act.label,
     weight: act.weight, points_added: +points.toFixed(1), switch_penalty: +penalty.toFixed(1), url });
-  toast(`${appKey}: ${points > 0 ? "+" : ""}${Math.round(points)}%${penalty ? " (app-switching penalty)" : ""}`);
+  toast(`${appKey}: ${points > 0 ? "+" : ""}${Math.round(points)}%${penalty ? " (app-switching penalty)" : ""}${mult > 1 ? " (late night x" + mult + ": prioritise sleep)" : ""}`);
   done();
   maybeRoulette(before, S.level, doomscrolling);
 }
