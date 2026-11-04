@@ -16,7 +16,8 @@ from typing import List, Optional
 
 import typer
 
-from inventory import ACTIVITIES, APPS, ROULETTE_CLIPBOARD, ROULETTE_URL, URL_OVERRIDES
+from inventory import (ACTIVITIES, APPS, DOOMSCROLL_ACTIVITIES, DOOMSCROLL_STREAK, ROULETTE_CLIPBOARD, ROULETTE_URL,
+                       URL_OVERRIDES)
 
 HERE = Path(__file__).parent
 LOG_FILE = HERE / "log.txt"
@@ -134,13 +135,15 @@ def copy_to_clipboard(text: str) -> bool:
     return False
 
 
-def maybe_roulette(before: float, after: float) -> None:
-    """Crossing into the frayed band: copy the calming list and open the roulette site."""
-    if band(before)[1] == "frayed" or band(after)[1] != "frayed":
+def maybe_roulette(before: float, after: float, doomscrolling: bool = False) -> None:
+    """Crossing into the frayed band, or a doomscroll streak: copy the calming list and open the roulette site."""
+    frayed = band(before)[1] != "frayed" and band(after)[1] == "frayed"
+    if not (frayed or doomscrolling):
         return
     copied = copy_to_clipboard(ROULETTE_CLIPBOARD)
     webbrowser.open(ROULETTE_URL)
-    typer.echo(typer.style("Lots of overstimulation. Opening the roulette", fg="red", bold=True)
+    why = "Lots of overstimulation" if frayed else f"{DOOMSCROLL_STREAK} doomscroll launches in a row"
+    typer.echo(typer.style(f"{why}. Opening the roulette", fg="red", bold=True)
                + (" (activity list copied to clipboard)." if copied else "; couldn't copy, paste this list:\n" + ROULETTE_CLIPBOARD))
 
 
@@ -205,12 +208,16 @@ def do_open(s: dict, text: str) -> None:
         webbrowser.open(url)
 
     s["level"] = max(0.0, min(100.0, level_before + points))
+    # back-to-back doomscroll launches; any other launch (or a break) restarts the count
+    s["doom_streak"] = s.get("doom_streak", 0) + 1 if act_id in DOOMSCROLL_ACTIVITIES else 0
+    doomscrolling = s["doom_streak"] > 0 and s["doom_streak"] % DOOMSCROLL_STREAK == 0
     log("open", s, level_before, s["level"], command=text, app=app_key, activity=act_id,
         activity_label=label, weight=weight, points_added=round(points, 1),
-        switch_penalty=round(points - weight * POINTS_PER_WEIGHT, 1), url=url)
+        switch_penalty=round(points - weight * POINTS_PER_WEIGHT, 1), url=url,
+        doom_streak=s["doom_streak"])
     typer.echo(f"{'Opening' if url else 'Logged'} {app_key}: {label} (weight {weight}) {points:+.0f}%{note}")
     typer.echo(f"Level now:\n  {status_line(s['level'], s)}")
-    maybe_roulette(level_before, s["level"])
+    maybe_roulette(level_before, s["level"], doomscrolling)
 
 
 def do_show(s: dict) -> None:
@@ -225,6 +232,7 @@ def do_break(s: dict) -> None:
     log("break", s, before, s["level"], command="take break")  # mins_since_break = length of the stretch just ended
     s["last_break_at"] = now().isoformat()
     s["recent"] = []
+    s["doom_streak"] = 0
     typer.echo(f"Break logged. Level {before:.0f}% -> {s['level']:.0f}%\n  {status_line(s['level'], s)}")
 
 
@@ -257,6 +265,7 @@ def maybe_auto_break(s: dict) -> None:
     # the break is dated to when the idle threshold was crossed
     s["last_break_at"] = (datetime.fromisoformat(last) + timedelta(minutes=AUTO_BREAK_IDLE_MIN)).isoformat()
     s["recent"] = []
+    s["doom_streak"] = 0
     typer.echo(f"Auto-break: {idle:.0f} min idle. Level {before:.0f}% -> {s['level']:.0f}%")
 
 

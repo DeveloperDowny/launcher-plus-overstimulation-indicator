@@ -70,6 +70,11 @@ Reading book 10 pages, 1
 Reading boom 10 minutes, 1
 Gently bring attention to current task, 1"""
 
+# launching these this many times back to back (no other launch or break in between)
+# triggers the same roulette nudge as hitting the frayed band
+DOOMSCROLL_ACTIVITIES = ["short_videos", "social_profiles", "news"]
+DOOMSCROLL_STREAK = 3
+
 # app key -> (aliases typed by user, url, default activity, [activities it supports])
 APPS = {
     "instagram": (["instagram", "insta", "ig"], "https://www.instagram.com/", "social_profiles",
@@ -195,6 +200,7 @@ if __name__ == "__main__":  # regenerate web/inventory.json
         "apps": {k: {"aliases": a, "url": u, "default": d, "supports": sup} for k, (a, u, d, sup) in APPS.items()},
         "urlOverrides": {f"{a}|{b}": u for (a, b), u in URL_OVERRIDES.items()},
         "roulette": {"url": ROULETTE_URL, "clipboard": ROULETTE_CLIPBOARD},
+        "doomscroll": {"activities": DOOMSCROLL_ACTIVITIES, "streak": DOOMSCROLL_STREAK},
     }
     Path(__file__).with_name("web").joinpath("inventory.json").write_text(json.dumps(out), encoding="utf-8")
     print(f"wrote {len(out['activities'])} activities, {len(out['apps'])} apps")

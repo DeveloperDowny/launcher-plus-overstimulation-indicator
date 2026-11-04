@@ -20,6 +20,7 @@ const SWITCH_WINDOW_MIN = 5, SWITCH_APPS = 3, AUTO_BREAK_IDLE_MIN = 20;
 const BANDS = [[25, "calm", "Plenty of room. Go ahead."], [50, "steady", "Fine, but you're warming up."],
   [75, "loaded", "Getting heavy. A break would help."], [100, "frayed", "Overstimulated. Stop adding input; take a break."]];
 const MIN = 60000;
+let DOOM = { activities: ["short_videos", "social_profiles", "news"], streak: 3 }; // overridden by inventory.json
 
 let INV = null, userId = null, S = null; // S = {level, updatedAt, lastCmdAt, lastBreakAt, startedAt, recent:[[ms,app]]}
 
@@ -77,12 +78,13 @@ async function loadInventory() {
       if (!r.ok) throw new Error("HTTP " + r.status);
       const text = await r.text();
       INV = JSON.parse(text);
+      if (INV.doomscroll) DOOM = INV.doomscroll;
       store.set("inv", text);
       return INV;
     } catch (e) { lastErr = e; }
   }
   const cached = store.get("inv"); // fall back to the last good copy
-  if (cached) { try { INV = JSON.parse(cached); diag("Couldn't refresh the app list; using a saved copy."); return INV; } catch {} }
+  if (cached) { try { INV = JSON.parse(cached); if (INV.doomscroll) DOOM = INV.doomscroll; diag("Couldn't refresh the app list; using a saved copy."); return INV; } catch {} }
   throw new Error("Couldn't load the app list (inventory.json): " + ((lastErr && lastErr.message) || lastErr));
 }
 
@@ -93,11 +95,12 @@ function minsSinceBreak() { return Math.floor((Date.now() - (S.lastBreakAt ?? S.
 
 async function loadState() {
   const q = `events?user_id=eq.${encodeURIComponent(userId)}`;
-  const [last, brk, first, recent] = await Promise.all([
+  const [last, brk, first, recent, tail] = await Promise.all([
     sbGet(`${q}&order=ts.desc,id.desc&limit=1&select=ts,level_after`),
     sbGet(`${q}&event=in.(break,auto_break)&order=ts.desc,id.desc&limit=1&select=break_at`),
     sbGet(`${q}&order=ts.asc,id.asc&limit=1&select=ts`),
     sbGet(`${q}&event=eq.open&ts=gte.${new Date(Date.now() - SWITCH_WINDOW_MIN * MIN).toISOString()}&select=ts,app`),
+    sbGet(`${q}&event=in.(open,break,auto_break)&order=ts.desc,id.desc&limit=20&select=event,activity`).catch(() => []),
   ]);
   const t = last[0] ? Date.parse(last[0].ts) : null;
   S = {
@@ -105,7 +108,10 @@ async function loadState() {
     lastBreakAt: brk[0]?.break_at ? Date.parse(brk[0].break_at) : null,
     startedAt: first[0] ? Date.parse(first[0].ts) : Date.now(),
     recent: recent.map((r) => [Date.parse(r.ts), r.app]),
+    doomStreak: 0,
   };
+  // back-to-back doomscroll launches, newest first, stopping at any other launch or a break
+  for (const e of tail) { if (e.event === "open" && DOOM.activities.includes(e.activity)) S.doomStreak++; else break; }
 }
 
 // ---------- logging (same fields as the CLI's log.txt, plus user_id) ----------
@@ -134,7 +140,7 @@ function maybeAutoBreak() {
   const breakAt = S.lastCmdAt + AUTO_BREAK_IDLE_MIN * MIN;
   log("auto_break", before, S.level, { command: "(idle gap)", idle_minutes: Math.round(idle), inferred: true,
     break_at: new Date(breakAt).toISOString() });
-  S.lastBreakAt = breakAt; S.recent = [];
+  S.lastBreakAt = breakAt; S.recent = []; S.doomStreak = 0;
   toast(`Auto-break: ${Math.round(idle)} min idle. ${Math.round(before)}% → ${Math.round(S.level)}%`);
 }
 function done() { S.lastCmdAt = Date.now(); render(); }
@@ -152,8 +158,8 @@ function openRoulette() {
   copyRouletteList();
   if (INV && INV.roulette) window.open(INV.roulette.url, "_blank", "noopener");
 }
-function maybeRoulette(before, after) {
-  if (bandOf(before)[1] !== "frayed" && bandOf(after)[1] === "frayed") openRoulette();
+function maybeRoulette(before, after, doomscrolling = false) {
+  if (doomscrolling || (bandOf(before)[1] !== "frayed" && bandOf(after)[1] === "frayed")) openRoulette();
 }
 
 function openApp(appKey, actId) {
@@ -168,12 +174,14 @@ function openApp(appKey, actId) {
   let points = act.weight * POINTS_PER_WEIGHT;
   if (act.weight > 0 && new Set(S.recent.map((r) => r[1])).size >= SWITCH_APPS) points += INV.activities.app_switching.weight * POINTS_PER_WEIGHT;
   S.level = Math.max(0, Math.min(100, before + points));
+  S.doomStreak = DOOM.activities.includes(actId) ? (S.doomStreak || 0) + 1 : 0; // any other launch restarts the count
+  const doomscrolling = S.doomStreak > 0 && S.doomStreak % DOOM.streak === 0;
   const penalty = points - act.weight * POINTS_PER_WEIGHT;
   log("open", before, S.level, { command: `${appKey} ${actId}`, app: appKey, activity: actId, activity_label: act.label,
     weight: act.weight, points_added: +points.toFixed(1), switch_penalty: +penalty.toFixed(1), url });
   toast(`${appKey}: ${points > 0 ? "+" : ""}${Math.round(points)}%${penalty ? " (app-switching penalty)" : ""}`);
   done();
-  maybeRoulette(before, S.level);
+  maybeRoulette(before, S.level, doomscrolling);
 }
 
 function takeBreak() {
@@ -181,7 +189,7 @@ function takeBreak() {
   S.level = before * (1 - BREAK_RELIEF);
   const at = Date.now();
   log("break", before, S.level, { command: "take break", break_at: new Date(at).toISOString() });
-  S.lastBreakAt = at; S.recent = [];
+  S.lastBreakAt = at; S.recent = []; S.doomStreak = 0;
   toast(`Break logged: ${Math.round(before)}% → ${Math.round(S.level)}%`);
   done();
 }
