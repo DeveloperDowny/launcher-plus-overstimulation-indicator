@@ -70,6 +70,39 @@ Reading book 10 pages, 1
 Reading boom 10 minutes, 1
 Gently bring attention to current task, 1"""
 
+# the first launch of each day copies this list (instead of the calming one) and opens the roulette;
+# copied verbatim, so the "$" stand-ins and repeated lines are as supplied
+ROULETTE_MORNING_CLIPBOARD = """As humans$ it's natural to experience challenging emotions. We can ignore them$ resist them$ or use them to better understand the mind., 1
+The more we can notice when the mind wants to be somewhere else more 'me-time' we discover in our life., 1
+By observing our resistance to challenging emotions we both suffering and prevent the emotion from escalating$, 1
+Emotions come and go$ but there's something deeper. If we listen$ we sense of inner peace and calm., 1
+It is in letting go of expectation$ allowing the mind to be free$ that we discover a sense of ease., 1
+There is nothing that is stable$ and there is nothing that can be defined. That's freedom., 1
+By chasing a time in the past that felt good$ we miss out on the present moment and deny ourselves the chance to feel better in the future., 1
+By being clear about what meditation is not$ we create the space for what it is., 1
+When we live with awareness: everything looks sharper$ sounds clearer$ feels richer$ smells stronger and tastes better., 1
+We assume it's the world around us that causes that feeling of busyness$ but often$ it's the movement of our mind., 1
+It's not our external environment that dictates our happiness$ but instead$ our relationship to that environment., 1
+As long as we are attached to the idea of this and that$ we will always be limited in our experience of life$, 1
+In meditation$ we might give memories more weight. But letting go doesn't mean we lose them. We just find peace., 1
+So much of confusion arises from choice. When we simplify life and reduce these options we experience more clarity., 1
+Only in realizing the simple truth of our shared human condition can we discover inner and outer peace.$, 1
+Love for others and love for one's self are the same. We often lean toward one over the other but meditation shows us there's room for both., 1
+Finding the time to look after the mind is incredibly serious$ yet ultimately it's about taking ourselves a little less seriously., 1
+Finding the time to look after the mind is incredibly serious$ yet ultimately it's about taking ourselves a little less seriously., 1
+So long as we are talking$ there is no room to listen. So long as the mind is busy$ there is no room for quiet., 1
+When we train the mind$ we're learning to listen$ not just to our thoughts and feelings$ but also to those around us., 1
+If we know how to listen to our intuition$ and if we learn to trust that feeling$ then we know which way to go., 1
+When we push hard for an answer$ we mostly remain confused. In letting go we create the space for what's needed., 1
+Happiness and contentment are different. It's hard to feel happy when we're sad. Contentment lets us live peacefully no matter what., 1
+Contentment is not found in the the realization that contentment is pursuit of external wishes$ but in right here and always has been., 1
+To live wisely is to keep death by our side$ appreciating each precious moment and finding peace with the impermanent nature of life., 1
+We meditate to remind ourselves that$ like the blue sky$ our enlightened nature is always with us. Even when it's obscured by clouds., 1
+Meditation helps us feel accepted and heard. We don't have to solve anything. We just need to listen with kindness., 1
+So long as we want a troubling emotion to leave us$ we give it renewed attention and energy to stay., 1
+does not mean we are awake. Just Just because our eyes are open$ because our eyes are closed$ does not mean we are asleep., 1
+Although the attitude of meditation is effortless$ the commitment to sit each day requires an undeniable effort$ however gentle., 1"""
+
 # launching these this many times back to back (no other launch or break in between)
 # triggers the same roulette nudge as hitting the frayed band
 DOOMSCROLL_ACTIVITIES = ["short_videos", "social_profiles", "news"]
@@ -199,7 +232,7 @@ if __name__ == "__main__":  # regenerate web/inventory.json
         "activities": {k: {"label": l, "weight": w, "modes": m} for k, (l, w, m) in ACTIVITIES.items()},
         "apps": {k: {"aliases": a, "url": u, "default": d, "supports": sup} for k, (a, u, d, sup) in APPS.items()},
         "urlOverrides": {f"{a}|{b}": u for (a, b), u in URL_OVERRIDES.items()},
-        "roulette": {"url": ROULETTE_URL, "clipboard": ROULETTE_CLIPBOARD},
+        "roulette": {"url": ROULETTE_URL, "clipboard": ROULETTE_CLIPBOARD, "morning": ROULETTE_MORNING_CLIPBOARD},
         "doomscroll": {"activities": DOOMSCROLL_ACTIVITIES, "streak": DOOMSCROLL_STREAK},
     }
     Path(__file__).with_name("web").joinpath("inventory.json").write_text(json.dumps(out), encoding="utf-8")

@@ -18,6 +18,7 @@ if (!window.CONFIG) diag("config.js failed to load. Reload the page; if it persi
 const POINTS_PER_WEIGHT = 1.5, DECAY_PER_MIN = 0.3, BREAK_RELIEF = 0.6;
 const SWITCH_WINDOW_MIN = 5, SWITCH_APPS = 3, AUTO_BREAK_IDLE_MIN = 20;
 const LATE_NIGHT_START = 22, LATE_NIGHT_END = 5, LATE_NIGHT_MULT = 1.5; // 10 PM-5 AM local: likely under-rested, prioritise sleep
+const localDate = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const lateNight = (d = new Date()) => d.getHours() >= LATE_NIGHT_START || d.getHours() < LATE_NIGHT_END;
 const BANDS = [[25, "calm", "Plenty of room. Go ahead."], [50, "steady", "Fine, but you're warming up."],
   [75, "loaded", "Getting heavy. A break would help."], [100, "frayed", "Overstimulated. Stop adding input; take a break."]];
@@ -102,7 +103,7 @@ async function loadState() {
     sbGet(`${q}&event=in.(break,auto_break)&order=ts.desc,id.desc&limit=1&select=break_at`),
     sbGet(`${q}&order=ts.asc,id.asc&limit=1&select=ts`),
     sbGet(`${q}&event=eq.open&ts=gte.${new Date(Date.now() - SWITCH_WINDOW_MIN * MIN).toISOString()}&select=ts,app`),
-    sbGet(`${q}&event=in.(open,break,auto_break)&order=ts.desc,id.desc&limit=20&select=event,activity`).catch(() => []),
+    sbGet(`${q}&event=in.(open,break,auto_break)&order=ts.desc,id.desc&limit=20&select=event,activity,ts`).catch(() => []),
   ]);
   const t = last[0] ? Date.parse(last[0].ts) : null;
   S = {
@@ -111,6 +112,7 @@ async function loadState() {
     startedAt: first[0] ? Date.parse(first[0].ts) : Date.now(),
     recent: recent.map((r) => [Date.parse(r.ts), r.app]),
     doomStreak: 0,
+    lastOpenDay: tail.find((e) => e.event === "open")?.ts ? localDate(new Date(tail.find((e) => e.event === "open").ts)) : null,
   };
   // back-to-back doomscroll launches, newest first, stopping at any other launch or a break
   for (const e of tail) { if (e.event === "open" && DOOM.activities.includes(e.activity)) S.doomStreak++; else break; }
@@ -150,18 +152,20 @@ function done() { S.lastCmdAt = Date.now(); render(); }
 // crossing into the frayed band: copy the calming list and open the roulette site.
 // Runs inside the tap, so the clipboard write is allowed; a second popup may still be
 // blocked, which is why the level card also shows a roulette button while frayed.
-function copyRouletteList() {
-  const text = INV && INV.roulette && INV.roulette.clipboard;
-  if (!text) return;
-  try { navigator.clipboard.writeText(text).then(() => toast("Lots of overstimulation: calming list copied, opening the roulette."),
-    () => toast("Lots of overstimulation: opening the roulette (couldn't copy the list).")); } catch {}
+// The first launch of the day copies the morning list instead.
+function openRoulette(text, why = "Lots of overstimulation", siteOpen = false) {
+  if (!INV || !INV.roulette) return;
+  text = text || INV.roulette.clipboard;
+  S.rouletteText = text; S.showRoulette = true; // keep the button around in case the extra tab is blocked
+  try { navigator.clipboard.writeText(text).then(() => toast(`${why}: list copied, opening the roulette.`),
+    () => toast(`${why}: opening the roulette (couldn't copy the list).`)); } catch {}
+  if (!siteOpen) window.open(INV.roulette.url, "_blank", "noopener");
+  render();
 }
-function openRoulette() {
-  copyRouletteList();
-  if (INV && INV.roulette) window.open(INV.roulette.url, "_blank", "noopener");
-}
-function maybeRoulette(before, after, doomscrolling = false) {
-  if (doomscrolling || (bandOf(before)[1] !== "frayed" && bandOf(after)[1] === "frayed")) openRoulette();
+function maybeRoulette(before, after, doomscrolling = false, firstOfDay = false, siteOpen = false) {
+  const frayed = bandOf(before)[1] !== "frayed" && bandOf(after)[1] === "frayed";
+  if (frayed || doomscrolling) openRoulette(null, frayed ? "Lots of overstimulation" : `${DOOM.streak} doomscroll launches in a row`, siteOpen);
+  else if (firstOfDay) openRoulette(INV.roulette && INV.roulette.morning, "First launch of the day", siteOpen);
 }
 
 function openApp(appKey, actId) {
@@ -179,13 +183,16 @@ function openApp(appKey, actId) {
   points *= mult;
   S.level = Math.max(0, Math.min(100, before + points));
   S.doomStreak = DOOM.activities.includes(actId) ? (S.doomStreak || 0) + 1 : 0; // any other launch restarts the count
+  const day = localDate(), prevDay = [S.lastOpenDay, store.get("lastOpen_" + userId)].filter(Boolean).sort().pop();
+  const firstOfDay = actId !== "going_to_sleep" && prevDay !== day; // a bedtime log doesn't use up the day's first launch
+  if (actId !== "going_to_sleep") { S.lastOpenDay = day; store.set("lastOpen_" + userId, day); }
   const doomscrolling = S.doomStreak > 0 && S.doomStreak % DOOM.streak === 0;
   const penalty = points / mult - act.weight * POINTS_PER_WEIGHT;
   log("open", before, S.level, { command: `${appKey} ${actId}`, app: appKey, activity: actId, activity_label: act.label,
     weight: act.weight, points_added: +points.toFixed(1), switch_penalty: +penalty.toFixed(1), url });
   toast(`${appKey}: ${points > 0 ? "+" : ""}${Math.round(points)}%${penalty ? " (app-switching penalty)" : ""}${mult > 1 ? " (late night x" + mult + ": prioritise sleep)" : ""}`);
   done();
-  maybeRoulette(before, S.level, doomscrolling);
+  maybeRoulette(before, S.level, doomscrolling, firstOfDay, appKey === "roulette");
 }
 
 function takeBreak() {
@@ -234,7 +241,7 @@ function render() {
   $("band").textContent = name.toUpperCase(); $("band").style.color = color;
   $("fill").style.width = l + "%"; $("fill").style.background = color;
   $("comment").textContent = comment;
-  $("rouletteBtn").hidden = name !== "frayed";
+  $("rouletteBtn").hidden = !(name === "frayed" || S.showRoulette);
   $("since").textContent = S.lastBreakAt ? `${minsSinceBreak()} min since last break`
     : `No break yet (${minsSinceBreak()} min since you started)`;
 }
@@ -295,7 +302,7 @@ function wire() {
   $("uid").addEventListener("input", () => { $("loginErr").textContent = ""; });
   $("search").oninput = renderApps;
   $("feel").oninput = () => ($("feelVal").textContent = $("feel").value);
-  $("rouletteBtn").onclick = openRoulette;
+  $("rouletteBtn").onclick = () => openRoulette(S && S.rouletteText);
   $("feelBtn").onclick = setFeel; $("breakBtn").onclick = takeBreak; $("fbBtn").onclick = sendText;
   document.querySelectorAll("[data-acc]").forEach((b) => (b.onclick = () => sendAccuracy(b.dataset.acc === "1")));
   $("logout").onclick = () => { store.del("uid"); location.reload(); };

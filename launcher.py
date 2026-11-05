@@ -16,7 +16,8 @@ from typing import List, Optional
 
 import typer
 
-from inventory import (ACTIVITIES, APPS, DOOMSCROLL_ACTIVITIES, DOOMSCROLL_STREAK, ROULETTE_CLIPBOARD, ROULETTE_URL,
+from inventory import (ACTIVITIES, APPS, DOOMSCROLL_ACTIVITIES, DOOMSCROLL_STREAK, ROULETTE_CLIPBOARD, ROULETTE_MORNING_CLIPBOARD,
+                       ROULETTE_URL,
                        URL_OVERRIDES)
 
 HERE = Path(__file__).parent
@@ -142,16 +143,23 @@ def copy_to_clipboard(text: str) -> bool:
     return False
 
 
-def maybe_roulette(before: float, after: float, doomscrolling: bool = False) -> None:
-    """Crossing into the frayed band, or a doomscroll streak: copy the calming list and open the roulette site."""
+def maybe_roulette(before: float, after: float, doomscrolling: bool = False, first_of_day: bool = False,
+                   site_open: bool = False) -> None:
+    """Copy a list and open the roulette site when the level crosses into frayed or a doomscroll streak hits
+    (calming list), or on the first launch of the day (morning list; the calming list wins if both apply).
+    site_open: the launch itself just opened the roulette, so don't open it twice."""
     frayed = band(before)[1] != "frayed" and band(after)[1] == "frayed"
-    if not (frayed or doomscrolling):
+    if not (frayed or doomscrolling or first_of_day):
         return
-    copied = copy_to_clipboard(ROULETTE_CLIPBOARD)
-    webbrowser.open(ROULETTE_URL)
-    why = "Lots of overstimulation" if frayed else f"{DOOMSCROLL_STREAK} doomscroll launches in a row"
-    typer.echo(typer.style(f"{why}. Opening the roulette", fg="red", bold=True)
-               + (" (activity list copied to clipboard)." if copied else "; couldn't copy, paste this list:\n" + ROULETTE_CLIPBOARD))
+    calming = frayed or doomscrolling
+    text = ROULETTE_CLIPBOARD if calming else ROULETTE_MORNING_CLIPBOARD
+    copied = copy_to_clipboard(text)
+    if not site_open:
+        webbrowser.open(ROULETTE_URL)
+    why = ("Lots of overstimulation" if frayed else f"{DOOMSCROLL_STREAK} doomscroll launches in a row"
+           if doomscrolling else "First launch of the day")
+    typer.echo(typer.style(f"{why}. Opening the roulette", fg="red" if calming else "green", bold=True)
+               + (" (activity list copied to clipboard)." if copied else "; couldn't copy, paste this list:\n" + text))
 
 
 # --- command parsing -------------------------------------------------------
@@ -202,6 +210,10 @@ def do_open(s: dict, text: str) -> None:
     cutoff = t - timedelta(minutes=SWITCH_WINDOW_MIN)
     s["recent"] = [r for r in s.get("recent", []) if datetime.fromisoformat(r[0]) >= cutoff]
     points = weight * POINTS_PER_WEIGHT
+    today = t.date().isoformat()
+    first_of_day = act_id != "going_to_sleep" and s.get("last_open_date") != today  # a bedtime log doesn't use up the day's first launch
+    if act_id != "going_to_sleep":
+        s["last_open_date"] = today
     mult = LATE_NIGHT_MULT if weight > 0 and late_night(t) else 1.0  # calming/neutral launches are never boosted
     note = ""
     if weight > 0:  # calming launches (negative weight) neither count as switching nor trigger the penalty
@@ -225,10 +237,10 @@ def do_open(s: dict, text: str) -> None:
     log("open", s, level_before, s["level"], command=text, app=app_key, activity=act_id,
         activity_label=label, weight=weight, points_added=round(points, 1),
         switch_penalty=round(points / mult - weight * POINTS_PER_WEIGHT, 1), late_night_mult=mult, url=url,
-        doom_streak=s["doom_streak"])
+        doom_streak=s["doom_streak"], first_of_day=first_of_day)
     typer.echo(f"{'Opening' if url else 'Logged'} {app_key}: {label} (weight {weight}) {points:+.0f}%{note}")
     typer.echo(f"Level now:\n  {status_line(s['level'], s)}")
-    maybe_roulette(level_before, s["level"], doomscrolling)
+    maybe_roulette(level_before, s["level"], doomscrolling, first_of_day, site_open=app_key == "roulette")
 
 
 def do_show(s: dict) -> None:
