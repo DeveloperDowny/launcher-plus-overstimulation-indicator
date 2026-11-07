@@ -128,6 +128,8 @@ APPS = {
     "messenger": (["messenger"], "https://www.messenger.com/", "intense_convo", ["intense_convo"]),
     "imessage": (["imessage"], "https://www.icloud.com/", "intense_convo", ["intense_convo"]),
     "chrome": (["chrome"], "https://www.google.com/", "app_switching", ["app_switching"]),
+    "brave": (["brave"], "https://search.brave.com/", "app_switching", ["app_switching"]),
+    "duckduckgo": (["duck duck go", "duckduckgo", "ddg"], "https://duckduckgo.com/", "app_switching", ["app_switching"]),
     "reddit": (["reddit"], "https://www.reddit.com/", "news", ["news", "after_busy_day", "before_sleep", "app_switching"]),
     "x": (["x", "twitter"], "https://x.com/", "news", ["news", "social_profiles", "after_busy_day"]),
     "linkedin": (["linkedin"], "https://www.linkedin.com/", "social_profiles", ["social_profiles"]),
@@ -155,6 +157,8 @@ APPS = {
     "flipkart": (["flipkart"], "https://www.flipkart.com/", "shopping", ["shopping"]),
     "myntra": (["myntra"], "https://www.myntra.com/", "shopping", ["shopping"]),
     "ajio": (["ajio"], "https://www.ajio.com/", "shopping", ["shopping"]),
+    "blinkit": (["blinkit"], "https://blinkit.com/", "shopping", ["shopping"]),
+    "swiggy": (["swiggy"], "https://www.swiggy.com/", "shopping", ["shopping"]),
     "pinterest": (["pinterest"], "https://www.pinterest.com/", "shopping", ["shopping"]),
     # --- calming apps / sites ---
     "spotify": (["spotify"], "https://open.spotify.com/", "calm_music", ["calm_music", "nature_sounds", "audiobook", "sleep_audio"]),
