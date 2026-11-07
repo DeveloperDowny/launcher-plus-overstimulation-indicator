@@ -17,6 +17,7 @@ ACTIVITIES = {
     "intense_convo":  ("Emotionally intense conversations", 8, ["dm", "dms", "heated", "intense"]),
     "before_sleep":   ("Phone use before sleep", 8, ["bedtime", "sleep", "night"]),
     "app_switching":  ("Switching rapidly between apps", 8, []),  # auto-detected, see launcher.py
+    "checking_loop":  ("Reopening the same app repeatedly", 6, []),  # auto-detected, see app.js / launcher.py
     "doomscroll":     ("Doomscrolling in a browser", 8, ["doomscroll", "doom"]),
     "obsessive_scroll": ("Obsessive, compulsive scrolling in a browser", 12, ["obsessivescroll", "obsessive"]),  # keep the highest weight
     "news":           ("Reading news feeds", 7, ["news", "feed", "headlines"]),

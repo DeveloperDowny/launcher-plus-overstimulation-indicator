@@ -29,7 +29,10 @@ POINTS_PER_WEIGHT = 1.5      # one launch adds weight * this to the level
 DECAY_PER_MIN = 0.3          # passive recovery per idle minute (slow: HSPs settle slowly)
 BREAK_RELIEF = 0.6           # a break removes this fraction of current level
 SWITCH_WINDOW_MIN = 5        # >= SWITCH_APPS distinct apps within window -> switching penalty
-SWITCH_APPS = 3
+SWITCH_APPS = 3              # (applied at most once per SWITCH_WINDOW_MIN)
+CHECK_REPEATS = 3            # same app this many times within CHECK_WINDOW_MIN -> checking-loop penalty
+CHECK_WINDOW_MIN = 10        # (applied at most once per window per app)
+BREAK_FULL_MIN = 15          # an inferred break this long gets the full BREAK_RELIEF; shorter ones scale down
 AUTO_BREAK_IDLE_MIN = 20     # idle gap before the next command that counts as an (inferred) break
 LATE_NIGHT_START = 22        # from 10 PM until LATE_NIGHT_END (local time) stimulating launches hit harder
 LATE_NIGHT_END = 5
@@ -88,6 +91,19 @@ def log(event: str, s: dict, level_before: float, level_after: float, **extra) -
     }
     with LOG_FILE.open("a", encoding="utf-8") as f:
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+
+def rest_relief(level_before: float, minutes: float) -> float:
+    """One rest formula (same as the web app): the larger of plain decay or length-scaled relief, never both."""
+    scaled = level_before * BREAK_RELIEF * min(1.0, minutes / BREAK_FULL_MIN)
+    return min(level_before, max(DECAY_PER_MIN * minutes, scaled))
+
+
+def reset_windows(s: dict) -> None:
+    s["recent"] = []
+    s["last_switch_penalty_at"] = None
+    s["last_check_penalty_at"] = {}
+    s["doom_streak"] = 0
 
 
 def late_night(t: datetime) -> bool:
@@ -205,9 +221,9 @@ def do_open(s: dict, text: str) -> None:
 
     typer.echo(f"Level before launch:\n  {status_line(level_before, s)}")
 
-    # rapid app-switching penalty (rule: N distinct apps within the window)
+    # stimulating launches in the last CHECK_WINDOW_MIN, for the switching and checking-loop penalties
     t = now()
-    cutoff = t - timedelta(minutes=SWITCH_WINDOW_MIN)
+    cutoff = t - timedelta(minutes=CHECK_WINDOW_MIN)
     s["recent"] = [r for r in s.get("recent", []) if datetime.fromisoformat(r[0]) >= cutoff]
     points = weight * POINTS_PER_WEIGHT
     today = t.date().isoformat()
@@ -216,13 +232,24 @@ def do_open(s: dict, text: str) -> None:
         s["last_open_date"] = today
     mult = NIGHT_MULT.get(act_id, LATE_NIGHT_MULT) if weight > 0 and late_night(t) else 1.0  # calming/neutral launches are never boosted
     note = ""
-    if weight > 0:  # calming launches (negative weight) neither count as switching nor trigger the penalty
+    sw = ck = 0.0
+    repeat = None
+    if weight > 0:  # calming launches (negative weight) neither count as switching/checking nor trigger the penalties
         s["recent"].append([t.isoformat(), app_key])
-    if weight > 0 and len({r[1] for r in s["recent"]}) >= SWITCH_APPS:
-        sw = ACTIVITIES["app_switching"][1] * POINTS_PER_WEIGHT
-        points += sw
-        note = f" (+{sw:.0f} app-switching penalty)"
-    points *= mult
+        within = lambda iso, m: t - datetime.fromisoformat(iso) < timedelta(minutes=m)
+        last_sw = s.get("last_switch_penalty_at")
+        if (len({a for ts, a in s["recent"] if within(ts, SWITCH_WINDOW_MIN)}) >= SWITCH_APPS
+                and (not last_sw or not within(last_sw, SWITCH_WINDOW_MIN))):
+            sw = ACTIVITIES["app_switching"][1] * POINTS_PER_WEIGHT
+            s["last_switch_penalty_at"] = t.isoformat()
+            note += f" (+{sw:.0f} app-switching penalty)"
+        repeat = sum(1 for _, a in s["recent"] if a == app_key)
+        last_ck = s.setdefault("last_check_penalty_at", {}).get(app_key)
+        if repeat >= CHECK_REPEATS and (not last_ck or not within(last_ck, CHECK_WINDOW_MIN)):
+            ck = ACTIVITIES["checking_loop"][1] * POINTS_PER_WEIGHT
+            s["last_check_penalty_at"][app_key] = t.isoformat()
+            note += f" (+{ck:.0f} checking loop)"
+    points = (points + sw + ck) * mult
     if mult > 1:
         note += f" (x{mult:g} late night: prioritise sleep)"
 
@@ -236,7 +263,7 @@ def do_open(s: dict, text: str) -> None:
     doomscrolling = s["doom_streak"] > 0 and s["doom_streak"] % DOOMSCROLL_STREAK == 0
     log("open", s, level_before, s["level"], command=text, app=app_key, activity=act_id,
         activity_label=label, weight=weight, points_added=round(points, 1),
-        switch_penalty=round(points / mult - weight * POINTS_PER_WEIGHT, 1), late_night_mult=mult, url=url,
+        switch_penalty=round(sw, 1), check_penalty=round(ck * mult, 1), repeat_count=repeat, late_night_mult=mult, url=url,
         doom_streak=s["doom_streak"], first_of_day=first_of_day)
     typer.echo(f"{'Opening' if url else 'Logged'} {app_key}: {label} (weight {weight}) {points:+.0f}%{note}")
     typer.echo(f"Level now:\n  {status_line(s['level'], s)}")
@@ -254,8 +281,7 @@ def do_break(s: dict) -> None:
     s["level"] = before * (1 - BREAK_RELIEF)
     log("break", s, before, s["level"], command="take break")  # mins_since_break = length of the stretch just ended
     s["last_break_at"] = now().isoformat()
-    s["recent"] = []
-    s["doom_streak"] = 0
+    reset_windows(s)
     typer.echo(f"Break logged. Level {before:.0f}% -> {s['level']:.0f}%\n  {status_line(s['level'], s)}")
 
 
@@ -281,14 +307,16 @@ def maybe_auto_break(s: dict) -> None:
     idle = (now() - datetime.fromisoformat(last)).total_seconds() / 60
     if idle <= AUTO_BREAK_IDLE_MIN:
         return
-    before = settle(s)
-    s["level"] = before * (1 - BREAK_RELIEF)
-    log("auto_break", s, before, s["level"], command="(idle gap)", idle_minutes=round(idle),
-        inferred=True)  # mins_since_break = length of the stretch just ended
+    # level when the rest began (not decayed), then one rest formula for the whole gap
+    before = max(0.0, s["level"] - DECAY_PER_MIN * max(0.0, (datetime.fromisoformat(last) - datetime.fromisoformat(s["updated_at"])).total_seconds() / 60))
+    relief = rest_relief(before, idle)
+    s["level"] = before - relief
+    s["updated_at"] = now().isoformat()
+    log("auto_break", s, before, s["level"], command="(idle gap)", idle_minutes=round(idle), inferred=True,
+        break_minutes=round(idle, 2), relief=round(relief, 1))  # mins_since_break = length of the stretch just ended
     # the break is dated to when the idle threshold was crossed
     s["last_break_at"] = (datetime.fromisoformat(last) + timedelta(minutes=AUTO_BREAK_IDLE_MIN)).isoformat()
-    s["recent"] = []
-    s["doom_streak"] = 0
+    reset_windows(s)
     typer.echo(f"Auto-break: {idle:.0f} min idle. Level {before:.0f}% -> {s['level']:.0f}%")
 
 

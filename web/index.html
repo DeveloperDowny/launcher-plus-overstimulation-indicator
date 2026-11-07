@@ -19,6 +19,8 @@
   button { font:inherit; border:0; border-radius:10px; padding:10px 14px; background:var(--accent); color:#fff; cursor:pointer; }
   button.ghost { background:transparent; color:var(--accent); border:1px solid var(--line); padding:6px 10px; font-size:14px; }
   button.row { width:100%; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .x { float:right; padding:2px 8px; }
   input[type=text], textarea { width:100%; font:inherit; padding:10px; border-radius:10px; border:1px solid var(--line);
           background:var(--bg); color:var(--text); -webkit-text-fill-color:var(--text); caret-color:var(--accent);
           -webkit-user-select:text; user-select:text; pointer-events:auto; position:relative; z-index:1; }
@@ -60,6 +62,23 @@
   <section id="appview" hidden>
     <div class="flex"><strong id="who"></strong><span><a href="help.html" style="color:var(--accent);margin-right:12px">Help</a><button class="ghost" id="logout">Switch ID</button></span></div>
 
+    <div class="card" id="sessQ" hidden style="margin-top:12px">
+      <button class="ghost x" id="sessDismiss" aria-label="Dismiss">&times;</button>
+      <strong id="sessQText"></strong>
+      <div class="chips"><button class="ghost" data-sess="5">~5 min</button><button class="ghost" data-sess="15">~15 min</button>
+        <button class="ghost" data-sess="30">~30 min</button><button class="ghost" data-sess="all">The whole time</button></div>
+    </div>
+
+    <div class="card" id="morning" hidden style="margin-top:12px">
+      <strong>Good morning. How did you sleep?</strong>
+      <div class="chips"><button class="ghost" data-morning="sleep_quality:poor">Poor</button><button class="ghost" data-morning="sleep_quality:ok">OK</button>
+        <button class="ghost" data-morning="sleep_quality:good">Good</button></div>
+      <div style="margin-top:10px"><strong>How heavy does today look?</strong></div>
+      <div class="chips"><button class="ghost" data-morning="day_load:light">Light</button><button class="ghost" data-morning="day_load:normal">Normal</button>
+        <button class="ghost" data-morning="day_load:heavy">Heavy</button></div>
+      <div class="chips"><button class="ghost" id="morningSkip">Skip</button></div>
+    </div>
+
     <h2>Your level</h2>
     <div class="card">
       <div class="big"><span id="pct">0</span>% <span id="band" style="font-size:20px"></span></div>
@@ -73,7 +92,12 @@
     <div class="card">
       <div class="flex"><span class="muted">0%</span><strong><span id="feelVal">50</span>% overstimulated</strong><span class="muted">100%</span></div>
       <input type="range" id="feel" min="0" max="100" value="50">
-      <button class="row" id="feelBtn" style="margin-top:8px">Set my level</button>
+      <button class="row" id="feelBtn" style="margin-top:8px" disabled>Set my level</button>
+      <div class="muted" id="feelHint" style="margin-top:6px">Move the slider first</div>
+      <div id="feelConfirm" hidden style="margin-top:10px">
+        <div id="feelConfirmQ"></div>
+        <div class="chips"><button id="feelYes"></button><button class="ghost" id="feelNo">Cancel</button></div>
+      </div>
       <div id="accBox" hidden style="margin-top:10px">
         <div class="muted" id="accQ"></div>
         <div class="chips"><button class="ghost" data-acc="1">Close enough</button><button class="ghost" data-acc="0">Way off</button></div>
@@ -81,6 +105,14 @@
     </div>
 
     <button class="row" id="breakBtn" style="background:var(--calm)">Take a break</button>
+
+    <div class="card" style="margin-top:10px">
+      <div class="muted">Right now I&hellip;</div>
+      <div class="chips"><button class="ghost" data-ctx="meal">Ate a meal</button><button class="ghost" data-ctx="caffeine">Had caffeine</button>
+        <button class="ghost" data-ctx="with_people">Am with people</button><button class="ghost" data-ctx="alone">Am alone</button>
+        <button class="ghost" data-ctx="stress">Am stressed</button><button class="ghost" data-ctx="exercise">Exercised</button>
+        <button class="ghost" data-ctx="outside">Am outside</button></div>
+    </div>
 
     <h2>Launch</h2>
     <input type="text" id="search" placeholder="Search apps…" autocomplete="off">
