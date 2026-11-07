@@ -17,9 +17,13 @@ if (!window.CONFIG) diag("config.js failed to load. Reload the page; if it persi
 
 const POINTS_PER_WEIGHT = 1.5, DECAY_PER_MIN = 0.3, BREAK_RELIEF = 0.6;
 const SWITCH_WINDOW_MIN = 5, SWITCH_APPS = 3, AUTO_BREAK_IDLE_MIN = 20;
+const LATE_NIGHT_START = 22, LATE_NIGHT_END = 5, LATE_NIGHT_MULT = 1.5; // 10 PM-5 AM local: likely under-rested, prioritise sleep
+const localDate = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const lateNight = (d = new Date()) => d.getHours() >= LATE_NIGHT_START || d.getHours() < LATE_NIGHT_END;
 const BANDS = [[25, "calm", "Plenty of room. Go ahead."], [50, "steady", "Fine, but you're warming up."],
   [75, "loaded", "Getting heavy. A break would help."], [100, "frayed", "Overstimulated. Stop adding input; take a break."]];
 const MIN = 60000;
+let DOOM = { activities: ["short_videos", "social_profiles", "news"], streak: 3 }; // overridden by inventory.json
 
 let INV = null, userId = null, S = null; // S = {level, updatedAt, lastCmdAt, lastBreakAt, startedAt, recent:[[ms,app]]}
 
@@ -77,12 +81,13 @@ async function loadInventory() {
       if (!r.ok) throw new Error("HTTP " + r.status);
       const text = await r.text();
       INV = JSON.parse(text);
+      if (INV.doomscroll) DOOM = INV.doomscroll;
       store.set("inv", text);
       return INV;
     } catch (e) { lastErr = e; }
   }
   const cached = store.get("inv"); // fall back to the last good copy
-  if (cached) { try { INV = JSON.parse(cached); diag("Couldn't refresh the app list; using a saved copy."); return INV; } catch {} }
+  if (cached) { try { INV = JSON.parse(cached); if (INV.doomscroll) DOOM = INV.doomscroll; diag("Couldn't refresh the app list; using a saved copy."); return INV; } catch {} }
   throw new Error("Couldn't load the app list (inventory.json): " + ((lastErr && lastErr.message) || lastErr));
 }
 
@@ -93,11 +98,12 @@ function minsSinceBreak() { return Math.floor((Date.now() - (S.lastBreakAt ?? S.
 
 async function loadState() {
   const q = `events?user_id=eq.${encodeURIComponent(userId)}`;
-  const [last, brk, first, recent] = await Promise.all([
+  const [last, brk, first, recent, tail] = await Promise.all([
     sbGet(`${q}&order=ts.desc,id.desc&limit=1&select=ts,level_after`),
     sbGet(`${q}&event=in.(break,auto_break)&order=ts.desc,id.desc&limit=1&select=break_at`),
     sbGet(`${q}&order=ts.asc,id.asc&limit=1&select=ts`),
     sbGet(`${q}&event=eq.open&ts=gte.${new Date(Date.now() - SWITCH_WINDOW_MIN * MIN).toISOString()}&select=ts,app`),
+    sbGet(`${q}&event=in.(open,break,auto_break)&order=ts.desc,id.desc&limit=20&select=event,activity,ts`).catch(() => []),
   ]);
   const t = last[0] ? Date.parse(last[0].ts) : null;
   S = {
@@ -105,7 +111,11 @@ async function loadState() {
     lastBreakAt: brk[0]?.break_at ? Date.parse(brk[0].break_at) : null,
     startedAt: first[0] ? Date.parse(first[0].ts) : Date.now(),
     recent: recent.map((r) => [Date.parse(r.ts), r.app]),
+    doomStreak: 0,
+    lastOpenDay: tail.find((e) => e.event === "open")?.ts ? localDate(new Date(tail.find((e) => e.event === "open").ts)) : null,
   };
+  // back-to-back doomscroll launches, newest first, stopping at any other launch or a break
+  for (const e of tail) { if (e.event === "open" && DOOM.activities.includes(e.activity)) S.doomStreak++; else break; }
 }
 
 // ---------- logging (same fields as the CLI's log.txt, plus user_id) ----------
@@ -134,15 +144,34 @@ function maybeAutoBreak() {
   const breakAt = S.lastCmdAt + AUTO_BREAK_IDLE_MIN * MIN;
   log("auto_break", before, S.level, { command: "(idle gap)", idle_minutes: Math.round(idle), inferred: true,
     break_at: new Date(breakAt).toISOString() });
-  S.lastBreakAt = breakAt; S.recent = [];
+  S.lastBreakAt = breakAt; S.recent = []; S.doomStreak = 0;
   toast(`Auto-break: ${Math.round(idle)} min idle. ${Math.round(before)}% → ${Math.round(S.level)}%`);
 }
 function done() { S.lastCmdAt = Date.now(); render(); }
 
+// crossing into the frayed band: copy the calming list and open the roulette site.
+// Runs inside the tap, so the clipboard write is allowed; a second popup may still be
+// blocked, which is why the level card also shows a roulette button while frayed.
+// The first launch of the day copies the morning list instead.
+function openRoulette(text, why = "Lots of overstimulation", siteOpen = false) {
+  if (!INV || !INV.roulette) return;
+  text = text || INV.roulette.clipboard;
+  S.rouletteText = text; S.showRoulette = true; // keep the button around in case the extra tab is blocked
+  try { navigator.clipboard.writeText(text).then(() => toast(`${why}: list copied, opening the roulette.`),
+    () => toast(`${why}: opening the roulette (couldn't copy the list).`)); } catch {}
+  if (!siteOpen) window.open(INV.roulette.url, "_blank", "noopener");
+  render();
+}
+function maybeRoulette(before, after, doomscrolling = false, firstOfDay = false, siteOpen = false) {
+  const frayed = bandOf(before)[1] !== "frayed" && bandOf(after)[1] === "frayed";
+  if (frayed || doomscrolling) openRoulette(null, frayed ? "Lots of overstimulation" : `${DOOM.streak} doomscroll launches in a row`, siteOpen);
+  else if (firstOfDay) openRoulette(INV.roulette && INV.roulette.morning, "First launch of the day", siteOpen);
+}
+
 function openApp(appKey, actId) {
   const a = INV.apps[appKey], act = INV.activities[actId];
   const url = INV.urlOverrides[`${appKey}|${actId}`] || a.url;
-  window.open(url, "_blank", "noopener"); // must happen synchronously inside the tap
+  if (url) window.open(url, "_blank", "noopener"); // must happen synchronously inside the tap; dummy launches have no url
   maybeAutoBreak();
   const before = settle();
   const now = Date.now();
@@ -150,12 +179,20 @@ function openApp(appKey, actId) {
   if (act.weight > 0) S.recent.push([now, appKey]); // calming launches don't count as switching
   let points = act.weight * POINTS_PER_WEIGHT;
   if (act.weight > 0 && new Set(S.recent.map((r) => r[1])).size >= SWITCH_APPS) points += INV.activities.app_switching.weight * POINTS_PER_WEIGHT;
+  const mult = act.weight > 0 && lateNight() ? (INV.nightMult?.[actId] ?? LATE_NIGHT_MULT) : 1; // calming/neutral launches are never boosted
+  points *= mult;
   S.level = Math.max(0, Math.min(100, before + points));
-  const penalty = points - act.weight * POINTS_PER_WEIGHT;
+  S.doomStreak = DOOM.activities.includes(actId) ? (S.doomStreak || 0) + 1 : 0; // any other launch restarts the count
+  const day = localDate(), prevDay = [S.lastOpenDay, store.get("lastOpen_" + userId)].filter(Boolean).sort().pop();
+  const firstOfDay = actId !== "going_to_sleep" && prevDay !== day; // a bedtime log doesn't use up the day's first launch
+  if (actId !== "going_to_sleep") { S.lastOpenDay = day; store.set("lastOpen_" + userId, day); }
+  const doomscrolling = S.doomStreak > 0 && S.doomStreak % DOOM.streak === 0;
+  const penalty = points / mult - act.weight * POINTS_PER_WEIGHT;
   log("open", before, S.level, { command: `${appKey} ${actId}`, app: appKey, activity: actId, activity_label: act.label,
     weight: act.weight, points_added: +points.toFixed(1), switch_penalty: +penalty.toFixed(1), url });
-  toast(`${appKey}: ${points > 0 ? "+" : ""}${Math.round(points)}%${penalty ? " (app-switching penalty)" : ""}`);
+  toast(`${appKey}: ${points > 0 ? "+" : ""}${Math.round(points)}%${penalty ? " (app-switching penalty)" : ""}${mult > 1 ? " (late night x" + mult + ": prioritise sleep)" : ""}`);
   done();
+  maybeRoulette(before, S.level, doomscrolling, firstOfDay, appKey === "roulette");
 }
 
 function takeBreak() {
@@ -163,7 +200,7 @@ function takeBreak() {
   S.level = before * (1 - BREAK_RELIEF);
   const at = Date.now();
   log("break", before, S.level, { command: "take break", break_at: new Date(at).toISOString() });
-  S.lastBreakAt = at; S.recent = [];
+  S.lastBreakAt = at; S.recent = []; S.doomStreak = 0;
   toast(`Break logged: ${Math.round(before)}% → ${Math.round(S.level)}%`);
   done();
 }
@@ -178,6 +215,7 @@ function setFeel() {
   $("accQ").textContent = `The app estimated ${lastFeel.computed}% and you said ${v}%. Was the estimate:`;
   $("accBox").hidden = false;
   done();
+  maybeRoulette(before, v);
 }
 function sendAccuracy(ok) {
   sbPost("feedback", { user_id: userId, kind: "accuracy", accurate: ok, felt: lastFeel.felt, computed_level: lastFeel.computed });
@@ -203,6 +241,7 @@ function render() {
   $("band").textContent = name.toUpperCase(); $("band").style.color = color;
   $("fill").style.width = l + "%"; $("fill").style.background = color;
   $("comment").textContent = comment;
+  $("rouletteBtn").hidden = !(name === "frayed" || S.showRoulette);
   $("since").textContent = S.lastBreakAt ? `${minsSinceBreak()} min since last break`
     : `No break yet (${minsSinceBreak()} min since you started)`;
 }
@@ -222,7 +261,7 @@ function renderApps() {
       const act = INV.activities[actId];
       const b = document.createElement("button");
       b.className = actId === a.default ? "" : "ghost";
-      b.textContent = actId === a.default ? `Open ${key}` : `${act.modes[0] || act.label} (${act.weight})`;
+      b.textContent = actId === a.default ? `${a.url ? "Open" : "Log"} ${key}` : `${act.modes[0] || act.label} (${act.weight})`;
       b.onclick = () => openApp(key, actId);
       chips.appendChild(b);
     }
@@ -263,6 +302,7 @@ function wire() {
   $("uid").addEventListener("input", () => { $("loginErr").textContent = ""; });
   $("search").oninput = renderApps;
   $("feel").oninput = () => ($("feelVal").textContent = $("feel").value);
+  $("rouletteBtn").onclick = () => openRoulette(S && S.rouletteText);
   $("feelBtn").onclick = setFeel; $("breakBtn").onclick = takeBreak; $("fbBtn").onclick = sendText;
   document.querySelectorAll("[data-acc]").forEach((b) => (b.onclick = () => sendAccuracy(b.dataset.acc === "1")));
   $("logout").onclick = () => { store.del("uid"); location.reload(); };

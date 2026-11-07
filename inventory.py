@@ -4,6 +4,7 @@ Weights are 1-10: how strongly the activity overstimulates a highly sensitive
 person (Aron, *The Highly Sensitive Person*: sensory intensity, emotional
 processing depth, social pressure, and interruption all raise arousal).
 Negative weights are calming activities: they lower the level instead of raising it.
+Weight 0 is neutral: logged, but the level doesn't move.
 Edit freely - this file is the single source of truth. After editing, run
 `python inventory.py` to regenerate web/inventory.json for the web app.
 """
@@ -16,6 +17,8 @@ ACTIVITIES = {
     "intense_convo":  ("Emotionally intense conversations", 8, ["dm", "dms", "heated", "intense"]),
     "before_sleep":   ("Phone use before sleep", 8, ["bedtime", "sleep", "night"]),
     "app_switching":  ("Switching rapidly between apps", 8, []),  # auto-detected, see launcher.py
+    "doomscroll":     ("Doomscrolling in a browser", 8, ["doomscroll", "doom"]),
+    "obsessive_scroll": ("Obsessive, compulsive scrolling in a browser", 12, ["obsessivescroll", "obsessive"]),  # keep the highest weight
     "news":           ("Reading news feeds", 7, ["news", "feed", "headlines"]),
     "group_chats":    ("Participating in group chats", 7, ["group", "groups"]),
     "after_busy_day": ("Phone use right after a busy day", 7, ["tired", "evening", "busyday"]),
@@ -25,6 +28,7 @@ ACTIVITIES = {
     "work_messages":  ("Checking messages while working/studying", 6, ["working", "work", "study", "studying"]),
     "ai_chat":        ("AI chat across unrelated topics", 5, ["ask", "ai"]),
     "long_articles":  ("Long, information-dense articles", 4, ["read", "article", "articles", "paper", "papers"]),
+    "utility_task":   ("Quick utility task (payments, rides, maps)", 1, ["pay", "ride", "navigate", "map", "maps"]),
     # --- calming activities (negative weight = recovery) ---
     "breathing":      ("Guided breathing", -4, ["breathe", "breathing"]),
     "meditation":     ("Guided meditation / body scan", -4, ["meditate", "meditation", "bodyscan"]),
@@ -41,7 +45,73 @@ ACTIVITIES = {
     "nature_visuals": ("Calming nature photos / slow nature video", -2, ["photos", "scenery", "slow"]),
     "screen_timer":   ("Timer for a screen break / sitting quietly", -2, ["timer", "quiet", "sit"]),
     "trusted_msg":    ("One message to a trusted person", -2, ["trusted", "friend"]),
+    "reading":        ("Reading a physical book", -2, ["reading", "book"]),
+    "reading_bedtime": ("Reading a physical book at bedtime", -3, ["bedtime", "night"]),
+    # --- neutral (weight 0: logged only, level unchanged) ---
+    "going_to_sleep": ("Going to sleep", 0, ["bed", "gotosleep"]),
+    "back_to_work":   ("Going back to work", 0, ["backtowork", "resume"]),
+    "roulette":       ("Spin the calming-activity roulette", 0, ["spin", "roulette"]),
+    "gita_a_day":     ("Bhagwat Gita a Day", 0, ["gita", "verse"]),
+    "breakfast":      ("Breakfast", 0, ["breakfast"]),
+    "lunch":          ("Lunch", 0, ["lunch"]),
+    "dinner":         ("Dinner", 0, ["dinner"]),
+    "habits_mental":  ("7 Habits: mental", 0, ["mental"]),
 }
+
+# when a launch or "feel" pushes the level into the frayed band, this list is
+# copied to the clipboard and the roulette site is opened
+ROULETTE_URL = "https://roulette-s-v1.el.r.appspot.com/"
+ROULETTE_CLIPBOARD = """Visualize your comfort place for 1 min, 1
+Count breaths 1 set, 1
+Count breaths 2 set, 1
+One headspace session, 1
+One headspace podcast, 1
+One headspace sleep sound, 1
+Reading any book 3 pages, 1
+Reading book 10 pages, 1
+Reading boom 10 minutes, 1
+Gently bring attention to current task, 1"""
+
+# the first launch of each day copies this list (instead of the calming one) and opens the roulette;
+# copied verbatim, so the "$" stand-ins and repeated lines are as supplied
+ROULETTE_MORNING_CLIPBOARD = """As humans$ it's natural to experience challenging emotions. We can ignore them$ resist them$ or use them to better understand the mind., 1
+The more we can notice when the mind wants to be somewhere else more 'me-time' we discover in our life., 1
+By observing our resistance to challenging emotions we both suffering and prevent the emotion from escalating$, 1
+Emotions come and go$ but there's something deeper. If we listen$ we sense of inner peace and calm., 1
+It is in letting go of expectation$ allowing the mind to be free$ that we discover a sense of ease., 1
+There is nothing that is stable$ and there is nothing that can be defined. That's freedom., 1
+By chasing a time in the past that felt good$ we miss out on the present moment and deny ourselves the chance to feel better in the future., 1
+By being clear about what meditation is not$ we create the space for what it is., 1
+When we live with awareness: everything looks sharper$ sounds clearer$ feels richer$ smells stronger and tastes better., 1
+We assume it's the world around us that causes that feeling of busyness$ but often$ it's the movement of our mind., 1
+It's not our external environment that dictates our happiness$ but instead$ our relationship to that environment., 1
+As long as we are attached to the idea of this and that$ we will always be limited in our experience of life$, 1
+In meditation$ we might give memories more weight. But letting go doesn't mean we lose them. We just find peace., 1
+So much of confusion arises from choice. When we simplify life and reduce these options we experience more clarity., 1
+Only in realizing the simple truth of our shared human condition can we discover inner and outer peace.$, 1
+Love for others and love for one's self are the same. We often lean toward one over the other but meditation shows us there's room for both., 1
+Finding the time to look after the mind is incredibly serious$ yet ultimately it's about taking ourselves a little less seriously., 1
+Finding the time to look after the mind is incredibly serious$ yet ultimately it's about taking ourselves a little less seriously., 1
+So long as we are talking$ there is no room to listen. So long as the mind is busy$ there is no room for quiet., 1
+When we train the mind$ we're learning to listen$ not just to our thoughts and feelings$ but also to those around us., 1
+If we know how to listen to our intuition$ and if we learn to trust that feeling$ then we know which way to go., 1
+When we push hard for an answer$ we mostly remain confused. In letting go we create the space for what's needed., 1
+Happiness and contentment are different. It's hard to feel happy when we're sad. Contentment lets us live peacefully no matter what., 1
+Contentment is not found in the the realization that contentment is pursuit of external wishes$ but in right here and always has been., 1
+To live wisely is to keep death by our side$ appreciating each precious moment and finding peace with the impermanent nature of life., 1
+We meditate to remind ourselves that$ like the blue sky$ our enlightened nature is always with us. Even when it's obscured by clouds., 1
+Meditation helps us feel accepted and heard. We don't have to solve anything. We just need to listen with kindness., 1
+So long as we want a troubling emotion to leave us$ we give it renewed attention and energy to stay., 1
+does not mean we are awake. Just Just because our eyes are open$ because our eyes are closed$ does not mean we are asleep., 1
+Although the attitude of meditation is effortless$ the commitment to sit each day requires an undeniable effort$ however gentle., 1"""
+
+# activities that get a bigger late-night multiplier than the default (launcher.py LATE_NIGHT_MULT)
+NIGHT_MULT = {"doomscroll": 2.0}
+
+# launching these this many times back to back (no other launch or break in between)
+# triggers the same roulette nudge as hitting the frayed band
+DOOMSCROLL_ACTIVITIES = ["short_videos", "social_profiles", "news", "doomscroll", "obsessive_scroll"]
+DOOMSCROLL_STREAK = 3
 
 # app key -> (aliases typed by user, url, default activity, [activities it supports])
 APPS = {
@@ -62,7 +132,9 @@ APPS = {
     "discord": (["discord"], "https://discord.com/app", "group_chats", ["group_chats", "work_messages"]),
     "messenger": (["messenger"], "https://www.messenger.com/", "intense_convo", ["intense_convo"]),
     "imessage": (["imessage"], "https://www.icloud.com/", "intense_convo", ["intense_convo"]),
-    "chrome": (["chrome"], "https://www.google.com/", "app_switching", ["app_switching"]),
+    "chrome": (["chrome"], "https://www.google.com/", "app_switching", ["app_switching", "doomscroll", "obsessive_scroll"]),
+    "brave": (["brave"], "https://search.brave.com/", "app_switching", ["app_switching", "doomscroll", "obsessive_scroll"]),
+    "duckduckgo": (["duck duck go", "duckduckgo", "ddg"], "https://duckduckgo.com/", "app_switching", ["app_switching", "doomscroll", "obsessive_scroll"]),
     "reddit": (["reddit"], "https://www.reddit.com/", "news", ["news", "after_busy_day", "before_sleep", "app_switching"]),
     "x": (["x", "twitter"], "https://x.com/", "news", ["news", "social_profiles", "after_busy_day"]),
     "linkedin": (["linkedin"], "https://www.linkedin.com/", "social_profiles", ["social_profiles"]),
@@ -72,6 +144,17 @@ APPS = {
     "ndtv": (["ndtv"], "https://www.ndtv.com/", "news", ["news"]),
     "bbc news": (["bbc news", "bbc"], "https://www.bbc.com/news", "news", ["news"]),
     "netflix": (["netflix"], "https://www.netflix.com/", "loud_video", ["loud_video", "after_busy_day", "before_sleep"]),
+    # --- OTT / streaming (same profile as netflix) ---
+    "prime video": (["amazon prime video", "prime video", "amazon prime", "prime"], "https://www.primevideo.com/", "loud_video", ["loud_video", "after_busy_day", "before_sleep"]),
+    "hotstar": (["jiohotstar", "disney+ hotstar", "disney hotstar", "hotstar", "jiocinema"], "https://www.hotstar.com/", "loud_video", ["loud_video", "after_busy_day", "before_sleep"]),
+    "sonyliv": (["sonyliv", "sony liv"], "https://www.sonyliv.com/", "loud_video", ["loud_video", "after_busy_day", "before_sleep"]),
+    "zee5": (["zee5"], "https://www.zee5.com/", "loud_video", ["loud_video", "after_busy_day", "before_sleep"]),
+    "mx player": (["mx player", "mxplayer"], "https://www.mxplayer.in/", "loud_video", ["loud_video", "after_busy_day", "before_sleep"]),
+    "disney+": (["disney plus", "disney+", "disney"], "https://www.disneyplus.com/", "loud_video", ["loud_video", "after_busy_day", "before_sleep"]),
+    "apple tv": (["apple tv+", "apple tv", "appletv"], "https://tv.apple.com/", "loud_video", ["loud_video", "after_busy_day", "before_sleep"]),
+    "hbo max": (["hbo max", "hbo"], "https://www.max.com/", "loud_video", ["loud_video", "after_busy_day", "before_sleep"]),
+    "hulu": (["hulu"], "https://www.hulu.com/", "loud_video", ["loud_video", "after_busy_day", "before_sleep"]),
+    "crunchyroll": (["crunchyroll"], "https://www.crunchyroll.com/", "loud_video", ["loud_video", "after_busy_day", "before_sleep"]),
     "bgmi": (["bgmi"], "https://www.battlegroundsmobileindia.com/", "games", ["games"]),
     "cod mobile": (["call of duty mobile", "call of duty", "cod mobile", "cod"], "https://www.callofduty.com/mobile", "games", ["games"]),
     "free fire": (["free fire", "freefire"], "https://ff.garena.com/", "games", ["games"]),
@@ -90,6 +173,8 @@ APPS = {
     "flipkart": (["flipkart"], "https://www.flipkart.com/", "shopping", ["shopping"]),
     "myntra": (["myntra"], "https://www.myntra.com/", "shopping", ["shopping"]),
     "ajio": (["ajio"], "https://www.ajio.com/", "shopping", ["shopping"]),
+    "blinkit": (["blinkit"], "https://blinkit.com/", "shopping", ["shopping"]),
+    "swiggy": (["swiggy"], "https://www.swiggy.com/", "shopping", ["shopping"]),
     "pinterest": (["pinterest"], "https://www.pinterest.com/", "shopping", ["shopping"]),
     # --- calming apps / sites ---
     "spotify": (["spotify"], "https://open.spotify.com/", "calm_music", ["calm_music", "nature_sounds", "audiobook", "sleep_audio"]),
@@ -123,6 +208,24 @@ APPS = {
     "timer": (["timer", "google timer"], "https://www.google.com/search?q=timer", "screen_timer", ["screen_timer"]),
     "forest": (["forest"], "https://www.forestapp.cc/", "screen_timer", ["screen_timer"]),
     "signal": (["signal"], "https://signal.org/", "trusted_msg", ["trusted_msg"]),
+    "reading": (["reading", "physical book", "book"], "", "reading", ["reading", "reading_bedtime"]),
+    "play store": (["google play store", "play store", "playstore"], "https://play.google.com/store/apps", "shopping", ["shopping"]),
+    "app store": (["apple app store", "app store", "appstore"], "https://apps.apple.com/", "shopping", ["shopping"]),
+    "cal ai": (["cal ai", "calai", "calorie tracker"], "https://www.calai.app/", "utility_task", ["utility_task"]),
+    "gpay": (["google pay", "gpay"], "https://pay.google.com/", "utility_task", ["utility_task"]),
+    "phonepe": (["phonepe"], "https://www.phonepe.com/", "utility_task", ["utility_task"]),
+    "paytm": (["paytm"], "https://paytm.com/", "utility_task", ["utility_task"]),
+    "rapido": (["rapido"], "https://rapido.bike/", "utility_task", ["utility_task"]),
+    "google maps": (["google maps", "maps"], "https://www.google.com/maps", "utility_task", ["utility_task"]),
+    "roulette": (["roulette"], ROULETTE_URL, "roulette", ["roulette"]),
+    # --- dummy launches (no url: nothing opens, the event is just logged) ---
+    "sleep": (["going to sleep", "go to sleep", "sleep", "bed"], "", "going_to_sleep", ["going_to_sleep"]),
+    "back to work": (["going back to work", "back to work", "work"], "", "back_to_work", ["back_to_work"]),
+    "gita a day": (["bhagwat gita a day", "bhagavad gita a day", "bhagwat gita", "bhagavad gita", "gita a day", "gita"], "", "gita_a_day", ["gita_a_day"]),
+    "breakfast": (["breakfast"], "", "breakfast", ["breakfast"]),
+    "lunch": (["lunch"], "", "lunch", ["lunch"]),
+    "dinner": (["dinner"], "", "dinner", ["dinner"]),
+    "7-habits": (["7-habits", "7 habits", "seven habits"], "https://mental-roulette.vercel.app/", "habits_mental", ["habits_mental"]),
 }
 
 # (app, activity) -> specific URL, when it differs from the app's home page
@@ -149,6 +252,9 @@ if __name__ == "__main__":  # regenerate web/inventory.json
         "activities": {k: {"label": l, "weight": w, "modes": m} for k, (l, w, m) in ACTIVITIES.items()},
         "apps": {k: {"aliases": a, "url": u, "default": d, "supports": sup} for k, (a, u, d, sup) in APPS.items()},
         "urlOverrides": {f"{a}|{b}": u for (a, b), u in URL_OVERRIDES.items()},
+        "roulette": {"url": ROULETTE_URL, "clipboard": ROULETTE_CLIPBOARD, "morning": ROULETTE_MORNING_CLIPBOARD},
+        "doomscroll": {"activities": DOOMSCROLL_ACTIVITIES, "streak": DOOMSCROLL_STREAK},
+        "nightMult": NIGHT_MULT,
     }
     Path(__file__).with_name("web").joinpath("inventory.json").write_text(json.dumps(out), encoding="utf-8")
     print(f"wrote {len(out['activities'])} activities, {len(out['apps'])} apps")

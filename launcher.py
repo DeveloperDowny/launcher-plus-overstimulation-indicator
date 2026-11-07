@@ -6,6 +6,8 @@ Run:  python launcher.py          (interactive prompt)
 Commands: open <app> [mode] | show level | take break | feel <0-100> | apps | help | quit
 """
 import json
+import shutil
+import subprocess
 import sys
 import webbrowser
 from datetime import datetime, timedelta
@@ -14,7 +16,9 @@ from typing import List, Optional
 
 import typer
 
-from inventory import ACTIVITIES, APPS, URL_OVERRIDES
+from inventory import (ACTIVITIES, APPS, DOOMSCROLL_ACTIVITIES, DOOMSCROLL_STREAK, NIGHT_MULT, ROULETTE_CLIPBOARD, ROULETTE_MORNING_CLIPBOARD,
+                       ROULETTE_URL,
+                       URL_OVERRIDES)
 
 HERE = Path(__file__).parent
 LOG_FILE = HERE / "log.txt"
@@ -27,6 +31,9 @@ BREAK_RELIEF = 0.6           # a break removes this fraction of current level
 SWITCH_WINDOW_MIN = 5        # >= SWITCH_APPS distinct apps within window -> switching penalty
 SWITCH_APPS = 3
 AUTO_BREAK_IDLE_MIN = 20     # idle gap before the next command that counts as an (inferred) break
+LATE_NIGHT_START = 22        # from 10 PM until LATE_NIGHT_END (local time) stimulating launches hit harder
+LATE_NIGHT_END = 5
+LATE_NIGHT_MULT = 1.5        # you're likely under-rested and should be heading to sleep
 
 BANDS = [(25, "calm", "Plenty of room. Go ahead."),
          (50, "steady", "Fine, but you're warming up."),
@@ -83,6 +90,10 @@ def log(event: str, s: dict, level_before: float, level_after: float, **extra) -
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
 
+def late_night(t: datetime) -> bool:
+    return t.hour >= LATE_NIGHT_START or t.hour < LATE_NIGHT_END
+
+
 def decayed(s: dict) -> float:
     idle = (now() - datetime.fromisoformat(s["updated_at"])).total_seconds() / 60
     return max(0.0, s["level"] - DECAY_PER_MIN * idle)
@@ -117,6 +128,38 @@ def status_line(level: float, s: dict) -> str:
     color = {"calm": "green", "steady": "cyan", "loaded": "yellow", "frayed": "red"}[name]
     head = typer.style(f"[{bar(level)}] {level:.0f}%  {name.upper()}", fg=color, bold=True)
     return f"{head} - {comment}\n  {since_break(s)}"
+
+
+# --- overstimulation response ---------------------------------------------
+def copy_to_clipboard(text: str) -> bool:
+    """Best effort, no extra dependency: the OS clipboard tool if one is installed."""
+    for cmd in (["clip"], ["pbcopy"], ["wl-copy"], ["xclip", "-selection", "clipboard"], ["xsel", "-ib"]):
+        if shutil.which(cmd[0]):
+            try:
+                subprocess.run(cmd, input=text.encode(), check=True)
+                return True
+            except (OSError, subprocess.CalledProcessError):
+                pass
+    return False
+
+
+def maybe_roulette(before: float, after: float, doomscrolling: bool = False, first_of_day: bool = False,
+                   site_open: bool = False) -> None:
+    """Copy a list and open the roulette site when the level crosses into frayed or a doomscroll streak hits
+    (calming list), or on the first launch of the day (morning list; the calming list wins if both apply).
+    site_open: the launch itself just opened the roulette, so don't open it twice."""
+    frayed = band(before)[1] != "frayed" and band(after)[1] == "frayed"
+    if not (frayed or doomscrolling or first_of_day):
+        return
+    calming = frayed or doomscrolling
+    text = ROULETTE_CLIPBOARD if calming else ROULETTE_MORNING_CLIPBOARD
+    copied = copy_to_clipboard(text)
+    if not site_open:
+        webbrowser.open(ROULETTE_URL)
+    why = ("Lots of overstimulation" if frayed else f"{DOOMSCROLL_STREAK} doomscroll launches in a row"
+           if doomscrolling else "First launch of the day")
+    typer.echo(typer.style(f"{why}. Opening the roulette", fg="red" if calming else "green", bold=True)
+               + (" (activity list copied to clipboard)." if copied else "; couldn't copy, paste this list:\n" + text))
 
 
 # --- command parsing -------------------------------------------------------
@@ -167,6 +210,11 @@ def do_open(s: dict, text: str) -> None:
     cutoff = t - timedelta(minutes=SWITCH_WINDOW_MIN)
     s["recent"] = [r for r in s.get("recent", []) if datetime.fromisoformat(r[0]) >= cutoff]
     points = weight * POINTS_PER_WEIGHT
+    today = t.date().isoformat()
+    first_of_day = act_id != "going_to_sleep" and s.get("last_open_date") != today  # a bedtime log doesn't use up the day's first launch
+    if act_id != "going_to_sleep":
+        s["last_open_date"] = today
+    mult = NIGHT_MULT.get(act_id, LATE_NIGHT_MULT) if weight > 0 and late_night(t) else 1.0  # calming/neutral launches are never boosted
     note = ""
     if weight > 0:  # calming launches (negative weight) neither count as switching nor trigger the penalty
         s["recent"].append([t.isoformat(), app_key])
@@ -174,16 +222,25 @@ def do_open(s: dict, text: str) -> None:
         sw = ACTIVITIES["app_switching"][1] * POINTS_PER_WEIGHT
         points += sw
         note = f" (+{sw:.0f} app-switching penalty)"
+    points *= mult
+    if mult > 1:
+        note += f" (x{mult:g} late night: prioritise sleep)"
 
     url = URL_OVERRIDES.get((app_key, act_id), APPS[app_key][1])
-    webbrowser.open(url)
+    if url:  # dummy launches (sleep, back to work) have no url and only log
+        webbrowser.open(url)
 
     s["level"] = max(0.0, min(100.0, level_before + points))
+    # back-to-back doomscroll launches; any other launch (or a break) restarts the count
+    s["doom_streak"] = s.get("doom_streak", 0) + 1 if act_id in DOOMSCROLL_ACTIVITIES else 0
+    doomscrolling = s["doom_streak"] > 0 and s["doom_streak"] % DOOMSCROLL_STREAK == 0
     log("open", s, level_before, s["level"], command=text, app=app_key, activity=act_id,
         activity_label=label, weight=weight, points_added=round(points, 1),
-        switch_penalty=round(points - weight * POINTS_PER_WEIGHT, 1), url=url)
-    typer.echo(f"Opening {app_key}: {label} (weight {weight}) {points:+.0f}%{note}")
+        switch_penalty=round(points / mult - weight * POINTS_PER_WEIGHT, 1), late_night_mult=mult, url=url,
+        doom_streak=s["doom_streak"], first_of_day=first_of_day)
+    typer.echo(f"{'Opening' if url else 'Logged'} {app_key}: {label} (weight {weight}) {points:+.0f}%{note}")
     typer.echo(f"Level now:\n  {status_line(s['level'], s)}")
+    maybe_roulette(level_before, s["level"], doomscrolling, first_of_day, site_open=app_key == "roulette")
 
 
 def do_show(s: dict) -> None:
@@ -198,6 +255,7 @@ def do_break(s: dict) -> None:
     log("break", s, before, s["level"], command="take break")  # mins_since_break = length of the stretch just ended
     s["last_break_at"] = now().isoformat()
     s["recent"] = []
+    s["doom_streak"] = 0
     typer.echo(f"Break logged. Level {before:.0f}% -> {s['level']:.0f}%\n  {status_line(s['level'], s)}")
 
 
@@ -212,6 +270,7 @@ def do_feel(s: dict, arg: str) -> None:
     s["level"] = v
     log("feel", s, before, v, command="feel", felt=v, computed_level=round(before))
     typer.echo(f"Anchored. (computed was {before:.0f}%)\n  {status_line(v, s)}")
+    maybe_roulette(before, v)
 
 
 def maybe_auto_break(s: dict) -> None:
@@ -229,6 +288,7 @@ def maybe_auto_break(s: dict) -> None:
     # the break is dated to when the idle threshold was crossed
     s["last_break_at"] = (datetime.fromisoformat(last) + timedelta(minutes=AUTO_BREAK_IDLE_MIN)).isoformat()
     s["recent"] = []
+    s["doom_streak"] = 0
     typer.echo(f"Auto-break: {idle:.0f} min idle. Level {before:.0f}% -> {s['level']:.0f}%")
 
 
