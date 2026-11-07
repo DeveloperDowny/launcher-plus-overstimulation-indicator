@@ -17,6 +17,8 @@ ACTIVITIES = {
     "intense_convo":  ("Emotionally intense conversations", 8, ["dm", "dms", "heated", "intense"]),
     "before_sleep":   ("Phone use before sleep", 8, ["bedtime", "sleep", "night"]),
     "app_switching":  ("Switching rapidly between apps", 8, []),  # auto-detected, see launcher.py
+    "doomscroll":     ("Doomscrolling in a browser", 8, ["doomscroll", "doom"]),
+    "obsessive_scroll": ("Obsessive, compulsive scrolling in a browser", 12, ["obsessivescroll", "obsessive"]),  # keep the highest weight
     "news":           ("Reading news feeds", 7, ["news", "feed", "headlines"]),
     "group_chats":    ("Participating in group chats", 7, ["group", "groups"]),
     "after_busy_day": ("Phone use right after a busy day", 7, ["tired", "evening", "busyday"]),
@@ -103,9 +105,12 @@ So long as we want a troubling emotion to leave us$ we give it renewed attention
 does not mean we are awake. Just Just because our eyes are open$ because our eyes are closed$ does not mean we are asleep., 1
 Although the attitude of meditation is effortless$ the commitment to sit each day requires an undeniable effort$ however gentle., 1"""
 
+# activities that get a bigger late-night multiplier than the default (launcher.py LATE_NIGHT_MULT)
+NIGHT_MULT = {"doomscroll": 2.0}
+
 # launching these this many times back to back (no other launch or break in between)
 # triggers the same roulette nudge as hitting the frayed band
-DOOMSCROLL_ACTIVITIES = ["short_videos", "social_profiles", "news"]
+DOOMSCROLL_ACTIVITIES = ["short_videos", "social_profiles", "news", "doomscroll", "obsessive_scroll"]
 DOOMSCROLL_STREAK = 3
 
 # app key -> (aliases typed by user, url, default activity, [activities it supports])
@@ -127,9 +132,9 @@ APPS = {
     "discord": (["discord"], "https://discord.com/app", "group_chats", ["group_chats", "work_messages"]),
     "messenger": (["messenger"], "https://www.messenger.com/", "intense_convo", ["intense_convo"]),
     "imessage": (["imessage"], "https://www.icloud.com/", "intense_convo", ["intense_convo"]),
-    "chrome": (["chrome"], "https://www.google.com/", "app_switching", ["app_switching"]),
-    "brave": (["brave"], "https://search.brave.com/", "app_switching", ["app_switching"]),
-    "duckduckgo": (["duck duck go", "duckduckgo", "ddg"], "https://duckduckgo.com/", "app_switching", ["app_switching"]),
+    "chrome": (["chrome"], "https://www.google.com/", "app_switching", ["app_switching", "doomscroll", "obsessive_scroll"]),
+    "brave": (["brave"], "https://search.brave.com/", "app_switching", ["app_switching", "doomscroll", "obsessive_scroll"]),
+    "duckduckgo": (["duck duck go", "duckduckgo", "ddg"], "https://duckduckgo.com/", "app_switching", ["app_switching", "doomscroll", "obsessive_scroll"]),
     "reddit": (["reddit"], "https://www.reddit.com/", "news", ["news", "after_busy_day", "before_sleep", "app_switching"]),
     "x": (["x", "twitter"], "https://x.com/", "news", ["news", "social_profiles", "after_busy_day"]),
     "linkedin": (["linkedin"], "https://www.linkedin.com/", "social_profiles", ["social_profiles"]),
@@ -238,6 +243,7 @@ if __name__ == "__main__":  # regenerate web/inventory.json
         "urlOverrides": {f"{a}|{b}": u for (a, b), u in URL_OVERRIDES.items()},
         "roulette": {"url": ROULETTE_URL, "clipboard": ROULETTE_CLIPBOARD, "morning": ROULETTE_MORNING_CLIPBOARD},
         "doomscroll": {"activities": DOOMSCROLL_ACTIVITIES, "streak": DOOMSCROLL_STREAK},
+        "nightMult": NIGHT_MULT,
     }
     Path(__file__).with_name("web").joinpath("inventory.json").write_text(json.dumps(out), encoding="utf-8")
     print(f"wrote {len(out['activities'])} activities, {len(out['apps'])} apps")

@@ -16,7 +16,7 @@ from typing import List, Optional
 
 import typer
 
-from inventory import (ACTIVITIES, APPS, DOOMSCROLL_ACTIVITIES, DOOMSCROLL_STREAK, ROULETTE_CLIPBOARD, ROULETTE_MORNING_CLIPBOARD,
+from inventory import (ACTIVITIES, APPS, DOOMSCROLL_ACTIVITIES, DOOMSCROLL_STREAK, NIGHT_MULT, ROULETTE_CLIPBOARD, ROULETTE_MORNING_CLIPBOARD,
                        ROULETTE_URL,
                        URL_OVERRIDES)
 
@@ -214,7 +214,7 @@ def do_open(s: dict, text: str) -> None:
     first_of_day = act_id != "going_to_sleep" and s.get("last_open_date") != today  # a bedtime log doesn't use up the day's first launch
     if act_id != "going_to_sleep":
         s["last_open_date"] = today
-    mult = LATE_NIGHT_MULT if weight > 0 and late_night(t) else 1.0  # calming/neutral launches are never boosted
+    mult = NIGHT_MULT.get(act_id, LATE_NIGHT_MULT) if weight > 0 and late_night(t) else 1.0  # calming/neutral launches are never boosted
     note = ""
     if weight > 0:  # calming launches (negative weight) neither count as switching nor trigger the penalty
         s["recent"].append([t.isoformat(), app_key])

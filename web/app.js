@@ -179,7 +179,7 @@ function openApp(appKey, actId) {
   if (act.weight > 0) S.recent.push([now, appKey]); // calming launches don't count as switching
   let points = act.weight * POINTS_PER_WEIGHT;
   if (act.weight > 0 && new Set(S.recent.map((r) => r[1])).size >= SWITCH_APPS) points += INV.activities.app_switching.weight * POINTS_PER_WEIGHT;
-  const mult = act.weight > 0 && lateNight() ? LATE_NIGHT_MULT : 1; // calming/neutral launches are never boosted
+  const mult = act.weight > 0 && lateNight() ? (INV.nightMult?.[actId] ?? LATE_NIGHT_MULT) : 1; // calming/neutral launches are never boosted
   points *= mult;
   S.level = Math.max(0, Math.min(100, before + points));
   S.doomStreak = DOOM.activities.includes(actId) ? (S.doomStreak || 0) + 1 : 0; // any other launch restarts the count
