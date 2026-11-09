@@ -123,6 +123,10 @@ NIGHT_MULT = {"doomscroll": 2.0}
 DOOMSCROLL_ACTIVITIES = ["short_videos", "social_profiles", "news", "doomscroll", "obsessive_scroll"]
 DOOMSCROLL_STREAK = 3
 
+# the person the messenger launches write to, as an international number without "+" (country code first)
+MESSAGE_PHONE = "911234569899"
+MESSAGE_TEXT = "Hi"
+
 # app key -> (aliases typed by user, url, default activity, [activities it supports])
 APPS = {
     "instagram": (["instagram", "insta", "ig"], "https://www.instagram.com/", "social_profiles",
@@ -132,16 +136,16 @@ APPS = {
                  "nature_sounds", "nature_visuals", "relaxation", "stretching", "meditation", "calm_music"]),
     "tiktok": (["tiktok"], "https://www.tiktok.com/", "short_videos", ["short_videos", "loud_video"]),
     "snapchat": (["snapchat", "snap"], "https://www.snapchat.com/spotlight", "short_videos", ["short_videos"]),
-    "whatsapp": (["whatsapp", "wa"], "https://web.whatsapp.com/", "group_chats",
+    "whatsapp": (["whatsapp", "wa"], f"https://wa.me/{MESSAGE_PHONE}?text={MESSAGE_TEXT}", "group_chats",
                  ["group_chats", "intense_convo", "notifications", "work_messages", "before_sleep", "app_switching", "trusted_msg"]),
     "gmail": (["gmail", "email", "mail"], "https://mail.google.com/", "notifications", ["notifications", "work_messages"]),
     "slack": (["slack"], "https://app.slack.com/", "work_messages", ["notifications", "group_chats", "work_messages"]),
     "teams": (["microsoft teams", "teams", "ms teams"], "https://teams.microsoft.com/", "work_messages",
               ["notifications", "group_chats", "work_messages"]),
-    "telegram": (["telegram"], "https://web.telegram.org/", "group_chats", ["group_chats", "intense_convo"]),
+    "telegram": (["telegram"], f"https://t.me/+{MESSAGE_PHONE}", "group_chats", ["group_chats", "intense_convo"]),
     "discord": (["discord"], "https://discord.com/app", "group_chats", ["group_chats", "work_messages"]),
     "messenger": (["messenger"], "https://www.messenger.com/", "intense_convo", ["intense_convo"]),
-    "imessage": (["imessage"], "https://www.icloud.com/", "intense_convo", ["intense_convo"]),
+    "imessage": (["imessage"], f"sms:+{MESSAGE_PHONE}?&body={MESSAGE_TEXT}", "intense_convo", ["intense_convo"]),
     "chrome": (["chrome"], "https://www.google.com/", "app_switching", ["app_switching", "doomscroll", "obsessive_scroll"]),
     "brave": (["brave"], "https://search.brave.com/", "app_switching", ["app_switching", "doomscroll", "obsessive_scroll"]),
     "duckduckgo": (["duck duck go", "duckduckgo", "ddg"], "https://duckduckgo.com/", "app_switching", ["app_switching", "doomscroll", "obsessive_scroll"]),
@@ -217,7 +221,7 @@ APPS = {
     "yoga with adriene": (["yoga with adriene", "adriene"], "https://yogawithadriene.com/", "stretching", ["stretching"]),
     "timer": (["timer", "google timer"], "https://www.google.com/search?q=timer", "screen_timer", ["screen_timer"]),
     "forest": (["forest"], "https://www.forestapp.cc/", "screen_timer", ["screen_timer"]),
-    "signal": (["signal"], "https://signal.org/", "trusted_msg", ["trusted_msg"]),
+    "signal": (["signal"], f"https://signal.me/#p/+{MESSAGE_PHONE}", "trusted_msg", ["trusted_msg"]),
     "reading": (["reading", "physical book", "book"], "", "reading", ["reading", "reading_bedtime"]),
     "play store": (["google play store", "play store", "playstore"], "https://play.google.com/store/apps", "shopping", ["shopping"]),
     "app store": (["apple app store", "app store", "appstore"], "https://apps.apple.com/", "shopping", ["shopping"]),
