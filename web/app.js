@@ -15,6 +15,15 @@ window.addEventListener("unhandledrejection", (e) => diag("Error: " + ((e.reason
 const C = window.CONFIG || { SUPABASE_URL: "", SUPABASE_KEY: "", USER_IDS: [] };
 if (!window.CONFIG) diag("config.js failed to load. Reload the page; if it persists, contact the study team.");
 
+const store = {
+  get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+  del: (k) => { try { localStorage.removeItem(k); } catch {} },
+};
+// testing only: localStorage.debugFlags = '{"idleCap":null,"glance":false,"floor":true}' overrides the switches below
+const FLAGS = (() => { try { return JSON.parse(store.get("debugFlags") || "{}"); } catch { return {}; } })();
+const flag = (k, dflt) => (k in FLAGS ? (FLAGS[k] === null ? Infinity : FLAGS[k]) : dflt);
+
 const POINTS_PER_WEIGHT = 1.5, DECAY_PER_MIN = 0.3, BREAK_RELIEF = 0.6;
 const SWITCH_WINDOW_MIN = 5, SWITCH_APPS = 3, AUTO_BREAK_IDLE_MIN = 20;
 const LATE_NIGHT_START = 22, LATE_NIGHT_END = 5, LATE_NIGHT_MULT = 1.5; // 10 PM-5 AM local: likely under-rested, prioritise sleep
@@ -29,24 +38,41 @@ const CHECK_WINDOW_MIN = 10;        // ...within this many minutes = checking lo
 // rest (B8, B9, A5)
 const BREAK_FULL_MIN = 15;          // a break this long gets the full BREAK_RELIEF (0.6)
 const SLEEP_GAP_MIN = 300;          // a gap of 5+ hrs before an action = sleep -> wake event
+// rest cap (F1): phone use outside the launcher is invisible, so only the first 30 min of a rest count
+const REST_CAP_MIN = 30;            // manual breaks: minutes that count toward relief
+const IDLE_REST_CAP_MIN = flag("idleCap", 30); // idle auto-breaks (gap 20 to 299 min). Infinity keeps the old behaviour
+// SLEEP_GAP_MIN: gaps at or above it are sleep and are never capped
+// glance discount (F3-A)
+const GLANCE_SEC = 10;              // a measured session this short is a "glance"
+const GLANCE_KEEP = 0.5;            // share of the launch points kept for a glance (penalties unaffected)
+const GLANCE_ON = flag("glance", true);
+// fatigue floor (F3-B), ships OFF until prompted check-ins show it helps
+const FATIGUE_FLOOR_ON = flag("floor", false);
+const FLOOR_FREE_HOURS = 8;         // no floor in the first 8 hrs after waking
+const FLOOR_PER_HOUR = 3;           // floor points per awake hour beyond that
+const FLOOR_MAX = 25;
+const FLOOR_POOR_SLEEP = 5;         // extra points when today's sleep_quality context is "poor"
+// prompted check-ins (F3-C)
+const PROMPT_AFTER_REST_MIN = 60;   // first action after a non-sleep rest this long
+const PROMPT_HIGH_LEVEL = 75;       // first time a burst reaches this
+const PROMPT_RANDOM_EVERY_MIN = 180;// average spacing of random prompts while active
+const PROMPT_MAX_PER_DAY = 4;
+const PROMPT_MIN_GAP_MIN = 90;
 // input safety (C3, D2)
 const FEEL_CONFIRM_DELTA = 30;      // confirm a check-in that moves the level by 30+ points
 const DOUBLE_TAP_MS = 2000;
 // nudges (E1)
 const NUDGE_WINDOW_MIN = 10;
-const SCORING_VERSION = "2026-11-sessions"; // on every event, so before/after this change can be told apart
+// on every event, so the scoring eras can be told apart; shipping defaults give "2026-11-cap-glance"
+const SCORING_VERSION = "2026-11" + "-cap" + (GLANCE_ON ? "-glance" : "") + (FATIGUE_FLOOR_ON ? "-floor" : "");
 const BANDS = [[25, "calm", "Plenty of room. Go ahead."], [50, "steady", "Fine, but you're warming up."],
   [75, "loaded", "Getting heavy. A break would help."], [100, "frayed", "Overstimulated. Stop adding input; take a break."]];
 const MIN = 60000;
 let DOOM = { activities: ["short_videos", "social_profiles", "news"], streak: 3 }; // overridden by inventory.json
 
-const store = {
-  get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
-  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
-  del: (k) => { try { localStorage.removeItem(k); } catch {} },
-};
 const now = () => Date.now() + (+store.get("debugSkewMs") || 0); // testers can time-travel via localStorage.debugSkewMs
 const localDate = (d = new Date(now())) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const wakeDayOf = (t) => localDate(new Date(t - 4 * 60 * MIN)); // the day runs 4 AM to 4 AM
 const lateNight = (d = new Date(now())) => d.getHours() >= LATE_NIGHT_START || d.getHours() < LATE_NIGHT_END;
 const bandOf = (l) => BANDS.find((b) => l <= b[0]);
 const clamp = (l) => Math.max(0, Math.min(100, l));
@@ -60,17 +86,25 @@ const DEVICE_ID = store.get("deviceId") || (() => { const id = newId(); store.se
 // Purely local UI state (pending session question, double-tap guard, roulette button) lives outside it.
 let INV = null, userId = null, S = null;
 let pendingSession = null; // {snap, gap}: a session closed after a long gap, waiting for "how long were you on X?"
-let lastTap = null, feelTouched = false, pendingFeel = null, lastFeel = null, leftAt = null;
+let lastTap = null, feelTouched = false, promptTouched = false, pendingFeel = null, lastFeel = null, leftAt = null;
 let rouletteText = null, showRoulette = false, morningAns = {};
+let promptQueued = null;   // F3-C: feel_source of a prompted check-in waiting to be shown
+let promptShown = null;    // feel_source of the prompt card on screen
+let sessionDiag = null;
+let acting = false;        // true while a tap is being handled, so a prompt never shows before that tap's nudge    // ?debug=sessions: how fast the page hides and comes back after a launch
 
 function freshState(t) {
   return {
     level: 0, updatedAt: t, startedAt: t, lastEventAt: null, lastBreakAt: null,
     opens: [],                         // [[ms, app]] stimulating launches since the last rest, last CHECK_WINDOW_MIN
-    lastSwitchPenaltyAt: null, lastCheckPenaltyAt: {}, doomStreak: 0, lastOpenDay: null,
-    session: null,                     // {app, activity, weight, mult, startedAt, levelAtStart, device}
+    lastSwitchPenaltyAt: null, lastCheckPenaltyAt: {}, doomStreak: 0, lastOpenWakeDay: null,
+    session: null,                     // {app, activity, weight, mult, startedAt, levelAtStart, launchPoints, device}
+    lastClosedSessionKey: null,        // "<startedAt>|<app>" of the last session_end, so a session is closed once
     breakStartedAt: null, levelAtBreakStart: null, restStartAt: null,
-    wakeDay: null, lastWakeDay: null, lastSleepLogAt: null,
+    wakeDay: null, lastWakeDay: null, wakeAt: null, lastSleepLogAt: null,
+    sleepQuality: null,                // {day, value} from the morning card
+    highPrompted: false,               // F3-C: prompt_high already queued in this burst
+    lastLaunchAt: null,                // F3-C: for the active time between launches (random prompts)
     nudge: null,                       // {id, reason, at}
   };
 }
@@ -104,9 +138,9 @@ async function flush() { // simple offline-tolerant queue
       const r = await fetch(`${C.SUPABASE_URL}/rest/v1/${table}`, {
         method: "POST", headers: headers({ Prefer: "return=minimal" }), body: JSON.stringify(row) });
       if (!r.ok && r.status >= 500) break; // retry later
-      if (!r.ok) diag(`The server rejected a ${row.event || table} record (HTTP ${r.status}); it was dropped.`);
+      if (!r.ok && r.status !== 409) diag(`The server rejected a ${row.event || table} record (HTTP ${r.status}); it was dropped.`);
       const cur = JSON.parse(store.get("pending") || "[]");
-      cur.shift(); // success, or a permanent client error we can't fix by retrying
+      cur.shift(); // success, a duplicate (409: session already closed), or a permanent client error
       store.set("pending", JSON.stringify(cur));
     }
   } catch { /* offline: keep queue */ }
@@ -141,15 +175,47 @@ function restRelief(levelBefore, minutes) {
   const scaled = levelBefore * BREAK_RELIEF * Math.min(1, minutes / BREAK_FULL_MIN);
   return Math.min(levelBefore, Math.max(decay, scaled));
 }
+const creditedMin = (minutes, cap) => Math.min(minutes, cap);
+// F3-B: after a long day, rest can't take the level below a floor that grows with hours awake (never raises it)
+function fatigueFloor(t) {
+  if (!FATIGUE_FLOOR_ON || S.wakeAt == null) return 0;
+  const hoursAwake = (t - S.wakeAt) / 3600000;
+  const poor = S.sleepQuality && S.sleepQuality.day === currentWakeDay() && S.sleepQuality.value === "poor";
+  return Math.max(0, Math.min(FLOOR_MAX, (hoursAwake - FLOOR_FREE_HOURS) * FLOOR_PER_HOUR)) + (poor ? FLOOR_POOR_SLEEP : 0);
+}
+// F1: one place that turns a rest into a level. Sleep (5+ hrs) is never capped and gets no floor.
+function restOutcome(before, minutes, cap, t) {
+  const sleep = minutes >= SLEEP_GAP_MIN;
+  const credited = sleep ? minutes : creditedMin(minutes, cap);
+  const plain = before - restRelief(before, credited);
+  const after = sleep ? plain : Math.max(plain, Math.min(before, fatigueFloor(t)));
+  return { credited, capped: credited < minutes, relief: before - after, after,
+    floor: FATIGUE_FLOOR_ON && !sleep ? after - plain : null };
+}
+// an idle gap long enough to count as rest, measured from restStartAt (the end of the last session)
+function idleRest(t) {
+  if (S.session || pendingSession || S.breakStartedAt != null || S.restStartAt == null) return null;
+  const gap = (t - S.restStartAt) / MIN;
+  if (gap <= AUTO_BREAK_IDLE_MIN) return null;
+  const before = Math.max(0, S.level - DECAY_PER_MIN * Math.max(0, S.restStartAt - S.updatedAt) / MIN); // level at rest start
+  return { gap, before, ...restOutcome(before, gap, IDLE_REST_CAP_MIN, t) };
+}
 function decayed(t = now()) {
-  if (S.breakStartedAt != null) return S.levelAtBreakStart - restRelief(S.levelAtBreakStart, (t - S.breakStartedAt) / MIN); // projected
+  if (S.breakStartedAt != null) return restOutcome(S.levelAtBreakStart, (t - S.breakStartedAt) / MIN, REST_CAP_MIN, t).after; // projected
   if (S.session && S.session.weight > 0) return S.level; // B1: no decay while still in a stimulating app
+  const rest = idleRest(t);
+  if (rest) return rest.after; // what the next action will log; frozen once the cap is reached
   return Math.max(0, S.level - DECAY_PER_MIN * Math.max(0, t - S.updatedAt) / MIN);
 }
 function settle(t = now()) { S.level = decayed(t); S.updatedAt = t; return S.level; }
 function minsSinceBreak() { return Math.floor((now() - (S.lastBreakAt ?? S.startedAt)) / MIN); }
-const currentWakeDay = () => S.wakeDay || localDate(new Date(now() - 4 * 60 * MIN)); // before any wake: 4 AM cutoff
-function resetWindows() { S.opens = []; S.lastSwitchPenaltyAt = null; S.lastCheckPenaltyAt = {}; S.doomStreak = 0; }
+// the wake day of the latest wake; the 4 AM date when there is none, or it's 2+ days stale (short sleeps log no wake)
+function currentWakeDay() {
+  const fallback = wakeDayOf(now());
+  if (!S.wakeDay || (Date.parse(fallback) - Date.parse(S.wakeDay)) / 86400000 >= 2) return fallback;
+  return S.wakeDay;
+}
+function resetWindows() { S.opens = []; S.lastSwitchPenaltyAt = null; S.lastCheckPenaltyAt = {}; S.doomStreak = 0; S.highPrompted = false; }
 
 // ---------- rebuild state from the newest events (pure; try it in the console) ----------
 function deriveState(events, nowMs, firstTs = null) {
@@ -170,8 +236,9 @@ function deriveState(events, nowMs, firstTs = null) {
     if (["session_end", "break", "break_end", "auto_break", "wake", "feel"].includes(e.event)) break;
     if (e.event !== "open") continue;
     if (e.url && e.weight && nowMs - e.t < SESSION_MAX_MIN * MIN) {
+      const mult = e.weight > 0 && lateNight(new Date(e.t)) ? nightMultFor(e.activity) : 1;
       st.session = { app: e.app, activity: e.activity, weight: e.weight, levelAtStart: e.level_after, startedAt: e.t,
-        mult: e.weight > 0 && lateNight(new Date(e.t)) ? nightMultFor(e.activity) : 1,
+        mult, launchPoints: e.weight * POINTS_PER_WEIGHT * mult,
         device: +store.get("sessionStart_" + e.user_id) === e.t ? DEVICE_ID : null };
     }
     break;
@@ -181,7 +248,13 @@ function deriveState(events, nowMs, firstTs = null) {
     if (e.event === "break") { st.breakStartedAt = e.t; st.levelAtBreakStart = e.level_after; break; }
   }
   st.wakeDay = e0.wake_day || null;
-  st.lastWakeDay = (ev.find((e) => e.event === "wake") || {}).wake_day || null;
+  const wake = ev.find((e) => e.event === "wake");
+  st.lastWakeDay = wake ? wake.wake_day : null;
+  st.wakeAt = wake ? wake.t : null;
+  const sq = ev.find((e) => e.event === "context" && e.tag === "sleep_quality");
+  if (sq && sq.wake_day) st.sleepQuality = { day: sq.wake_day, value: sq.tag_value };
+  const lastEnd = ev.find((e) => e.event === "session_end" && e.session_key);
+  st.lastClosedSessionKey = lastEnd ? lastEnd.session_key : null;
   const restIdx = ev.findIndex(isRest);
   const sinceRest = restIdx < 0 ? ev : ev.slice(0, restIdx);
   const opens = sinceRest.filter((e) => e.event === "open" && e.weight > 0 && nowMs - e.t < CHECK_WINDOW_MIN * MIN);
@@ -193,8 +266,10 @@ function deriveState(events, nowMs, firstTs = null) {
     if (e.event === "open") { if (DOOM.activities.includes(e.activity)) st.doomStreak++; else break; }
     else if (isRest(e)) break;
   }
+  const anyOpen = ev.find((e) => e.event === "open");
+  st.lastLaunchAt = anyOpen ? anyOpen.t : null;
   const lastOpen = ev.find((e) => e.event === "open" && e.activity !== "going_to_sleep");
-  st.lastOpenDay = lastOpen ? localDate(new Date(lastOpen.t)) : null;
+  st.lastOpenWakeDay = lastOpen ? lastOpen.wake_day || wakeDayOf(lastOpen.t) : null; // pre-002 rows have no wake_day
   const sleepLog = ev.find((e) => e.event === "open" && e.activity === "going_to_sleep");
   st.lastSleepLogAt = sleepLog ? sleepLog.t : null;
   const rest = ev.find(isRest);
@@ -263,16 +338,28 @@ function applySession(snap, minutes) {
   S.level = level; S.updatedAt = end; S.restStartAt = end; // decay and rest start when the session ended
   return { cost, level };
 }
+const sessionKey = (snap) => snap.startedAt + "|" + snap.app;
 function logSessionEnd(snap, minutes, endedBy) {
-  const { cost, level } = applySession(snap, minutes);
-  log("session_end", snap.levelAtStart, level, { command: "(session end)", app: snap.app, activity: snap.activity,
+  const key = sessionKey(snap);
+  if (S.lastClosedSessionKey === key) return; // F3-0: already closed in this tab (or one that broadcast it)
+  const { cost } = applySession(snap, minutes);
+  // F3-A: a measured session under GLANCE_SEC hands back part of the launch points (penalties are kept)
+  let refund = 0;
+  if (GLANCE_ON && (endedBy === "return" || endedBy === "next_action") && snap.weight > 0 && minutes * 60 < GLANCE_SEC) {
+    refund = (1 - GLANCE_KEEP) * (snap.launchPoints ?? snap.weight * POINTS_PER_WEIGHT * snap.mult);
+    S.level = clamp(S.level - refund);
+  }
+  S.lastClosedSessionKey = key;
+  log("session_end", snap.levelAtStart, S.level, { command: "(session end)", app: snap.app, activity: snap.activity,
     activity_label: INV && INV.activities[snap.activity] ? INV.activities[snap.activity].label : null, weight: snap.weight,
-    points_added: round1(cost), session_minutes: round1(minutes), ended_by: endedBy });
+    points_added: round1(cost), session_minutes: round1(minutes), ended_by: endedBy, session_key: key,
+    glance_refund: refund ? round1(refund) : null });
 }
 function closeSession(t, reason) { // reason: return | next_action
   const snap = S.session;
   if (!snap) return;
   S.session = null;
+  if (S.lastClosedSessionKey === sessionKey(snap)) return;
   const gap = (t - snap.startedAt) / MIN;
   if (gap <= SESSION_DEFAULT_MIN) return logSessionEnd(snap, gap, reason);
   if (reason === "return") { pendingSession = { snap, gap }; applySession(snap, SESSION_DEFAULT_MIN); return; } // ask; 20 min until answered
@@ -297,16 +384,15 @@ function sleepSource(sleepStart) {
   return s != null && s <= sleepStart && sleepStart - s <= 60 * MIN ? "logged" : "inferred";
 }
 function restCheck(t, lastEventBefore) {
-  if (S.session || pendingSession || S.breakStartedAt != null || S.restStartAt == null) return;
-  const gap = (t - S.restStartAt) / MIN;
-  if (gap <= AUTO_BREAK_IDLE_MIN) return;
-  const before = Math.max(0, S.level - DECAY_PER_MIN * Math.max(0, S.restStartAt - S.updatedAt) / MIN); // level at rest start
-  const relief = restRelief(before, gap), after = before - relief;
+  const rest = idleRest(t);
+  if (!rest) return;
+  const { gap, before, relief, after } = rest;
   const breakAt = S.restStartAt + AUTO_BREAK_IDLE_MIN * MIN;
-  S.level = after; S.updatedAt = t;
+  S.level = after; S.updatedAt = t; S.restStartAt = t; // the rest is used up
   if (gap >= SLEEP_GAP_MIN) {
-    const sleepStart = lastEventBefore ?? S.restStartAt;
-    S.wakeDay = S.lastWakeDay = localDate(new Date(t));
+    const sleepStart = lastEventBefore ?? (t - gap * MIN);
+    S.wakeDay = S.lastWakeDay = wakeDayOf(t); // a wake at 1 AM still belongs to the previous day
+    S.wakeAt = t;
     S.lastBreakAt = t;
     log("wake", before, after, { command: "(wake)", break_minutes: round2(gap), relief: round1(relief),
       sleep_start: iso(sleepStart), sleep_minutes: Math.round(gap), sleep_source: sleepSource(sleepStart) });
@@ -314,8 +400,10 @@ function restCheck(t, lastEventBefore) {
   } else {
     S.lastBreakAt = breakAt;
     log("auto_break", before, after, { command: "(idle gap)", idle_minutes: Math.round(gap), inferred: true,
-      break_at: iso(breakAt), break_minutes: round2(gap), relief: round1(relief) });
+      break_at: iso(breakAt), break_minutes: round2(gap), relief: round1(relief),
+      rest_credited_minutes: round2(rest.credited), rest_capped: rest.capped, floor_applied: rest.floor == null ? null : round1(rest.floor) });
     toast(`Auto-break: ${Math.round(gap)} min idle. ${Math.round(before)}% → ${Math.round(after)}%`);
+    if (gap >= PROMPT_AFTER_REST_MIN) queuePrompt("prompt_rest");
   }
   resetWindows();
 }
@@ -325,21 +413,23 @@ function startBreak(t) {
   const level = settle(t);
   log("break", level, level, { command: "take break", break_at: iso(t) });
   S.breakStartedAt = t; S.levelAtBreakStart = level;
-  toast(`Break started. The longer it lasts, the more it helps (full effect at ${BREAK_FULL_MIN} min).`);
+  toast(`Break started. Counts up to ${REST_CAP_MIN} min. Full effect at ${BREAK_FULL_MIN} min.`);
 }
 function endBreak(t) {
   const start = S.breakStartedAt, before = S.levelAtBreakStart;
   if (start == null) return;
-  const minutes = (t - start) / MIN, relief = restRelief(before, minutes), after = before - relief;
+  const minutes = (t - start) / MIN, rest = restOutcome(before, minutes, REST_CAP_MIN, t), after = rest.after;
   S.breakStartedAt = null; S.levelAtBreakStart = null;
   S.level = after; S.updatedAt = t; S.restStartAt = t; S.lastBreakAt = t;
   resetWindows();
-  log("break_end", before, after, { command: "end break", break_minutes: round2(minutes), relief: round1(relief) });
-  if (minutes >= SLEEP_GAP_MIN) { // slept through an open break: the break already brought the level down
-    S.wakeDay = S.lastWakeDay = localDate(new Date(t));
+  log("break_end", before, after, { command: "end break", break_minutes: round2(minutes), relief: round1(rest.relief),
+    rest_credited_minutes: round2(rest.credited), rest_capped: rest.capped, floor_applied: rest.floor == null ? null : round1(rest.floor) });
+  if (minutes >= SLEEP_GAP_MIN) { // slept through an open break (uncapped): the break already brought the level down
+    S.wakeDay = S.lastWakeDay = wakeDayOf(t);
+    S.wakeAt = t;
     log("wake", after, after, { command: "(wake)", break_minutes: round2(minutes), relief: 0,
       sleep_start: iso(start), sleep_minutes: Math.round(minutes), sleep_source: sleepSource(start) });
-  }
+  } else if (minutes >= PROMPT_AFTER_REST_MIN) queuePrompt("prompt_rest");
 }
 
 // ---------- nudges (E1) ----------
@@ -375,6 +465,7 @@ function tapOk(key) { // D2: ignore an identical tap within DOUBLE_TAP_MS
 }
 function beginAction(kind, d = {}) { // kind: launch | break | feel | context | morning | roulette_btn
   const t = now(), lastEventBefore = S.lastEventAt;
+  if (!acting) { acting = true; queueMicrotask(() => { acting = false; render(); }); } // runs once the whole tap is done
   if (kind !== "context") { // context chips don't close a session or end a break
     if (pendingSession) resolvePending(SESSION_DEFAULT_MIN, "default");
     closeSession(t, "next_action");
@@ -428,6 +519,7 @@ function openApp(appKey, actId) {
   const a = INV.apps[appKey], act = INV.activities[actId];
   const url = INV.urlOverrides[`${appKey}|${actId}`] || a.url;
   if (url) window.open(url, "_blank", "noopener"); // must happen synchronously inside the tap; dummy launches have no url
+  if (url && store.get("debugSessions")) sessionDiag = { app: appKey, at: performance.now(), hiddenAt: null };
   const t = beginAction("launch", { app: appKey, weight: act.weight });
   const before = settle(t);
   S.opens = S.opens.filter((r) => r[0] >= t - CHECK_WINDOW_MIN * MIN);
@@ -452,17 +544,25 @@ function openApp(appKey, actId) {
   const points = (act.weight * POINTS_PER_WEIGHT + sw + ck) * mult;
   S.level = clamp(before + points);
   S.doomStreak = DOOM.activities.includes(actId) ? (S.doomStreak || 0) + 1 : 0; // any other launch restarts the count
-  const day = localDate(new Date(t)), prevDay = [S.lastOpenDay, store.get("lastOpen_" + userId)].filter(Boolean).sort().pop();
-  const firstOfDay = actId !== "going_to_sleep" && prevDay !== day; // a bedtime log doesn't use up the day's first launch
-  if (actId !== "going_to_sleep") { S.lastOpenDay = day; store.set("lastOpen_" + userId, day); }
+  // F2: first launch of the wake day (4 AM to 4 AM, or from the last wake), not of the calendar date
+  const wd = currentWakeDay(); // after beginAction(), so a wake due now has been logged
+  const prevWd = [S.lastOpenWakeDay, store.get("lastOpenWD_" + userId)].filter(Boolean).sort().pop();
+  const firstOfDay = actId !== "going_to_sleep" && prevWd !== wd; // a bedtime log doesn't use up the day's first launch
+  if (actId !== "going_to_sleep") { S.lastOpenWakeDay = wd; store.set("lastOpenWD_" + userId, wd); }
   else S.lastSleepLogAt = t;
+  // F3-C: prompted check-ins, the first time a burst gets high and at random during active use
+  if (!S.highPrompted && before < PROMPT_HIGH_LEVEL && S.level >= PROMPT_HIGH_LEVEL) { S.highPrompted = true; queuePrompt("prompt_high"); }
+  const activeMin = S.lastLaunchAt == null ? 0 : Math.min(30, (t - S.lastLaunchAt) / MIN);
+  if (Math.random() < activeMin / PROMPT_RANDOM_EVERY_MIN) queuePrompt("prompt_random");
+  S.lastLaunchAt = t;
   const doomscrolling = S.doomStreak > 0 && S.doomStreak % DOOM.streak === 0;
   log("open", before, S.level, { command: `${appKey} ${actId}`, app: appKey, activity: actId, activity_label: act.label,
     weight: act.weight, points_added: round1(points), switch_penalty: round1(sw), check_penalty: round1(ck * mult),
     repeat_count: repeat, url });
   toast(`${appKey}: ${points > 0 ? "+" : ""}${Math.round(points)}%${sw ? " (app-switching penalty)" : ""}${ck ? " (checking loop)" : ""}${mult > 1 ? " (late night x" + mult + ": prioritise sleep)" : ""}`);
   if (url && act.weight !== 0) { // the time spent in the app is costed when you come back (sessions)
-    S.session = { app: appKey, activity: actId, weight: act.weight, mult, startedAt: t, levelAtStart: S.level, device: DEVICE_ID };
+    S.session = { app: appKey, activity: actId, weight: act.weight, mult, startedAt: t, levelAtStart: S.level,
+      launchPoints: act.weight * POINTS_PER_WEIGHT * mult, device: DEVICE_ID }; // launchPoints: what a glance hands half of back
     store.set("sessionStart_" + userId, String(t));
   }
   finishAction(t);
@@ -485,26 +585,31 @@ function takeBreak() {
   finishAction(t);
 }
 
-// C3: the button only works after the slider moved; big jumps need a confirm
-function submitFeel() {
-  if (!feelTouched) return;
-  const v = +$("feel").value, cur = decayed();
+// C3: the button only works after the slider moved; big jumps need a confirm.
+// card "self" is the check-in card; "prompt" is the prompted card (F3-C), logged with its feel_source.
+const FEEL_UI = { self: ["feel", "feelConfirm", "feelConfirmQ", "feelYes"], prompt: ["promptFeel", "promptConfirm", "promptConfirmQ", "promptYes"] };
+const feelSource = (card) => (card === "self" ? "self" : promptShown || "prompt_random");
+function submitFeel(card) {
+  const [slider, box, q, yes] = FEEL_UI[card];
+  if (card === "self" ? !feelTouched : !promptTouched) return;
+  const v = +$(slider).value, cur = decayed();
   if (Math.abs(v - cur) >= FEEL_CONFIRM_DELTA) {
-    pendingFeel = v;
-    $("feelConfirmQ").innerHTML = `The app thinks you're at <strong>${Math.round(cur)}%</strong>. Set it to <strong>${v}%</strong>?`;
-    $("feelYes").textContent = `Yes, set ${v}%`;
-    $("feelConfirm").hidden = false;
+    pendingFeel = { v, card };
+    $(q).innerHTML = `The app thinks you're at <strong>${Math.round(cur)}%</strong>. Set it to <strong>${v}%</strong>?`;
+    $(yes).textContent = `Yes, set ${v}%`;
+    $(box).hidden = false;
     return;
   }
-  setFeel(v, false);
+  setFeel(v, false, feelSource(card));
 }
-function setFeel(v, confirmed) {
+function setFeel(v, confirmed, source = "self") {
   if (!tapOk("feel")) return;
-  $("feelConfirm").hidden = true; pendingFeel = null;
+  $("feelConfirm").hidden = true; $("promptConfirm").hidden = true; pendingFeel = null;
   const t = beginAction("feel");
   const before = settle(t);
   S.level = v;
-  log("feel", before, v, { command: "feel", felt: v, computed_level: Math.round(before), feel_confirmed: confirmed });
+  log("feel", before, v, { command: "feel", felt: v, computed_level: Math.round(before), feel_confirmed: confirmed, feel_source: source });
+  if (source !== "self") { promptShown = null; promptTouched = false; }
   lastFeel = { felt: v, computed: Math.round(before) };
   $("accQ").textContent = `The app estimated ${lastFeel.computed}% and you said ${v}%. Was the estimate:`;
   $("accBox").hidden = false;
@@ -523,6 +628,30 @@ function sendText() {
   $("fbText").value = ""; toast("Feedback sent. Thank you!");
 }
 
+// F3-C: prompts are limited per wake day and spaced out; skipping changes nothing but still counts
+function promptAllowed(t) {
+  let c = {};
+  try { c = JSON.parse(store.get("promptCount_" + userId) || "{}"); } catch {}
+  const shownToday = c.day === currentWakeDay() ? c.n : 0;
+  return shownToday < PROMPT_MAX_PER_DAY && t - (+store.get("promptLastAt_" + userId) || 0) >= PROMPT_MIN_GAP_MIN * MIN;
+}
+function queuePrompt(source) { if (!promptQueued && !promptShown && promptAllowed(now())) promptQueued = source; }
+function maybeShowPrompt(t) { // held while a morning card or an unresolved nudge is on screen
+  if (acting || !promptQueued || promptShown || morningDue(t)) return;
+  if (S.nudge && (t - S.nudge.at) / MIN <= NUDGE_WINDOW_MIN) return;
+  const source = promptQueued;
+  promptQueued = null;
+  if (!promptAllowed(t)) return;
+  let c = {};
+  try { c = JSON.parse(store.get("promptCount_" + userId) || "{}"); } catch {}
+  const day = currentWakeDay();
+  store.set("promptCount_" + userId, JSON.stringify({ day, n: (c.day === day ? c.n : 0) + 1 }));
+  store.set("promptLastAt_" + userId, String(t));
+  promptShown = source; promptTouched = false;
+  $("promptFeel").value = 50; $("promptVal").textContent = "50"; // no carry-over from the last answer
+}
+function skipPrompt() { promptShown = null; $("promptConfirm").hidden = true; render(); }
+
 // A6: context never changes the level; it's for analysis
 function logContext(tag, value, t) {
   const l = decayed(t);
@@ -540,6 +669,7 @@ function answerMorning(tag, value) {
   const t = beginAction("morning"); // counts as an action, so it logs the wake if one is due
   logContext(tag, value, t);
   morningAns[tag] = value;
+  if (tag === "sleep_quality") S.sleepQuality = { day: currentWakeDay(), value }; // for the fatigue floor
   if (morningAns.sleep_quality && morningAns.day_load) store.set("morningDone_" + userId, currentWakeDay());
   finishAction(t);
 }
@@ -547,7 +677,7 @@ function skipMorning() { store.set("morningDone_" + userId, currentWakeDay()); r
 function morningDue(t) {
   const doneDay = store.get("morningDone_" + userId);
   const resting = S.restStartAt != null && !S.session && !pendingSession && S.breakStartedAt == null;
-  const byGap = resting && (t - S.restStartAt) / MIN >= SLEEP_GAP_MIN && doneDay !== localDate(new Date(t));
+  const byGap = resting && (t - S.restStartAt) / MIN >= SLEEP_GAP_MIN && doneDay !== wakeDayOf(t);
   const byWake = S.lastWakeDay != null && S.lastWakeDay === S.wakeDay && doneDay !== S.wakeDay;
   return byGap || byWake;
 }
@@ -570,7 +700,7 @@ function render() {
   $("since").textContent = onBreak ? `On a break · ${breakMin} min`
     : S.session ? `In ${S.session.app} · ${Math.floor((t - S.session.startedAt) / MIN)} min`
     : S.lastBreakAt ? `${minsSinceBreak()} min since last break` : `No break yet (${minsSinceBreak()} min since you started)`;
-  $("breakBtn").textContent = onBreak ? `End break · ${breakMin} min (full effect at ${BREAK_FULL_MIN} min)` : "Take a break";
+  $("breakBtn").textContent = onBreak ? `End break · ${breakMin} min · Counts up to ${REST_CAP_MIN} min. Full effect at ${BREAK_FULL_MIN} min.` : "Take a break";
   $("sessQ").hidden = !pendingSession;
   if (pendingSession) $("sessQText").textContent = `How long were you on ${pendingSession.snap.app}?`;
   $("morning").hidden = !morningDue(t);
@@ -579,6 +709,9 @@ function render() {
     b.className = morningAns[tag] === value ? "" : "ghost";
   });
   $("feelBtn").disabled = !feelTouched; $("feelHint").hidden = feelTouched;
+  maybeShowPrompt(t);
+  $("prompt").hidden = !promptShown;
+  $("promptBtn").disabled = !promptTouched; $("promptHint").hidden = promptTouched;
 }
 function renderApps() {
   const box = $("apps");
@@ -651,9 +784,18 @@ function wire() {
     feelTouched = true; $("feelConfirm").hidden = true; pendingFeel = null;
     if (S) render();
   };
-  $("feelBtn").onclick = submitFeel;
-  $("feelYes").onclick = () => pendingFeel != null && setFeel(pendingFeel, true);
-  $("feelNo").onclick = () => { $("feelConfirm").hidden = true; pendingFeel = null; };
+  $("feelBtn").onclick = () => submitFeel("self");
+  $("promptFeel").oninput = () => {
+    $("promptVal").textContent = $("promptFeel").value;
+    promptTouched = true; $("promptConfirm").hidden = true; pendingFeel = null;
+    if (S) render();
+  };
+  $("promptBtn").onclick = () => submitFeel("prompt");
+  $("promptSkip").onclick = skipPrompt;
+  const confirmYes = () => pendingFeel && setFeel(pendingFeel.v, true, feelSource(pendingFeel.card));
+  const confirmNo = () => { $("feelConfirm").hidden = true; $("promptConfirm").hidden = true; pendingFeel = null; };
+  $("feelYes").onclick = confirmYes; $("promptYes").onclick = confirmYes;
+  $("feelNo").onclick = confirmNo; $("promptNo").onclick = confirmNo;
   $("rouletteBtn").onclick = tapRoulette;
   $("breakBtn").onclick = takeBreak; $("fbBtn").onclick = sendText;
   document.querySelectorAll("[data-acc]").forEach((b) => (b.onclick = () => sendAccuracy(b.dataset.acc === "1")));
@@ -664,7 +806,17 @@ function wire() {
   document.querySelectorAll("[data-ctx]").forEach((b) => (b.onclick = () => tapContext(b.dataset.ctx, "yes")));
   $("logout").onclick = () => { store.del("uid"); location.reload(); };
   setInterval(() => { try { render(); } catch {} }, 30000);
-  document.addEventListener("visibilitychange", () => { if (document.hidden) leftAt = now(); else onVisible(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) { leftAt = now(); if (sessionDiag && sessionDiag.hiddenAt == null) sessionDiag.hiddenAt = performance.now(); }
+    else {
+      if (sessionDiag && sessionDiag.hiddenAt != null) { // ?debug=sessions: is a 0 s session real or the browser bouncing back?
+        diag(`${sessionDiag.app}: page hid ${Math.round(sessionDiag.hiddenAt - sessionDiag.at)} ms after launch, back ${Math.round(performance.now() - sessionDiag.hiddenAt)} ms later`);
+        sessionDiag = null;
+      }
+      onVisible();
+    }
+  });
+  if (/[?&]debug=sessions\b/.test(location.search)) store.set("debugSessions", "1");
 
   const saved = store.get("uid");
   if (saved && C.USER_IDS.includes(saved)) start(saved).catch((e) => diag("Couldn't start: " + e.message));

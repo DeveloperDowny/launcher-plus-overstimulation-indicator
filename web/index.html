@@ -79,6 +79,18 @@
       <div class="chips"><button class="ghost" id="morningSkip">Skip</button></div>
     </div>
 
+    <div class="card" id="prompt" hidden style="margin-top:12px">
+      <strong>How do you feel right now?</strong>
+      <div class="flex" style="margin-top:6px"><span class="muted">0%</span><strong><span id="promptVal">50</span>% overstimulated</strong><span class="muted">100%</span></div>
+      <input type="range" id="promptFeel" min="0" max="100" value="50">
+      <div class="chips"><button id="promptBtn" disabled>Save</button><button class="ghost" id="promptSkip">Skip</button></div>
+      <div class="muted" id="promptHint" style="margin-top:6px">Move the slider first</div>
+      <div id="promptConfirm" hidden style="margin-top:10px">
+        <div id="promptConfirmQ"></div>
+        <div class="chips"><button id="promptYes"></button><button class="ghost" id="promptNo">Cancel</button></div>
+      </div>
+    </div>
+
     <h2>Your level</h2>
     <div class="card">
       <div class="big"><span id="pct">0</span>% <span id="band" style="font-size:20px"></span></div>
