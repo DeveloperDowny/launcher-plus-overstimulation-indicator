@@ -13,11 +13,11 @@
   [hidden] { display:none !important; }
   * { box-sizing:border-box; }
   body { margin:0; font:16px/1.4 system-ui,sans-serif; background:var(--bg); color:var(--text); }
-  main { max-width:560px; margin:0 auto; padding:16px; }
-  h2 { font-size:15px; margin:24px 0 8px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:10px; }
+  main { max-width:560px; margin:0 auto; padding:10px 16px 16px; }
+  h2 { font-size:13px; margin:12px 0 5px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:8px; }
   button { font:inherit; border:0; border-radius:10px; padding:10px 14px; background:var(--accent); color:#fff; cursor:pointer; }
-  button.ghost { background:transparent; color:var(--accent); border:1px solid var(--line); padding:6px 10px; font-size:14px; }
+  button.ghost { background:transparent; color:var(--accent); border:1px solid var(--line); padding:5px 9px; font-size:13px; }
   button.row { width:100%; }
   button:disabled { opacity:.45; cursor:not-allowed; }
   .x { float:right; padding:2px 8px; }
@@ -27,16 +27,24 @@
   input[type=text]::placeholder, textarea::placeholder { color:var(--muted); -webkit-text-fill-color:var(--muted); opacity:1; }
   input[type=text]:focus, textarea:focus { outline:2px solid var(--accent); outline-offset:1px; }
   input[type=range] { width:100%; }
-  .bar { height:18px; background:var(--line); border-radius:9px; overflow:hidden; margin:10px 0; }
+  .bar { height:12px; background:var(--line); border-radius:6px; overflow:hidden; margin:6px 0; }
   .bar > div { height:100%; width:0; transition:width .3s, background .3s; }
-  .big { font-size:40px; font-weight:700; }
-  .muted { color:var(--muted); font-size:14px; }
+  .big { font-size:30px; line-height:1.15; font-weight:700; }
+  .muted { color:var(--muted); font-size:13px; }
   .flex { display:flex; gap:8px; align-items:center; justify-content:space-between; }
-  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .chips { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
   #toast { position:fixed; left:16px; right:16px; bottom:16px; max-width:528px; margin:0 auto; background:#111827; color:#fff;
            padding:12px 14px; border-radius:12px; display:none; z-index:9; pointer-events:none; }
   #diag { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; border-radius:10px; padding:10px 12px; margin-bottom:10px; font-size:14px; }
   #login .card { margin-top:20vh; }
+  /* compact main screen: same order, less air */
+  #appview button.row { padding:8px 12px; }
+  #breakBtn { margin-bottom:8px; }
+  #feel { margin:2px 0 0; display:block; }
+  #feelHint { font-size:12px; }
+  #band { font-size:16px !important; }
+  #comment { font-size:15px; }
+  #search { padding:8px 10px; }
 </style>
 </head>
 <body>
@@ -60,7 +68,7 @@
   </section>
 
   <section id="appview" hidden>
-    <div class="flex"><strong id="who"></strong><span><a href="help.html" style="color:var(--accent);margin-right:12px">Help</a><button class="ghost" id="logout">Switch ID</button></span></div>
+    <div class="flex" style="min-height:34px"><strong id="who"></strong><span><a href="help.html" style="color:var(--accent);margin-right:12px">Help</a><button class="ghost" id="logout">Switch ID</button></span></div>
 
     <div class="card" id="sessQ" hidden style="margin-top:12px">
       <button class="ghost x" id="sessDismiss" aria-label="Dismiss">&times;</button>
@@ -104,8 +112,8 @@
     <div class="card">
       <div class="flex"><span class="muted">0%</span><strong><span id="feelVal">50</span>% overstimulated</strong><span class="muted">100%</span></div>
       <input type="range" id="feel" min="0" max="100" value="50">
-      <button class="row" id="feelBtn" style="margin-top:8px" disabled>Set my level</button>
-      <div class="muted" id="feelHint" style="margin-top:6px">Move the slider first</div>
+      <button class="row" id="feelBtn" style="margin-top:6px" disabled>Set my level</button>
+      <div class="muted" id="feelHint" style="margin-top:4px">Move the slider first</div>
       <div id="feelConfirm" hidden style="margin-top:10px">
         <div id="feelConfirmQ"></div>
         <div class="chips"><button id="feelYes"></button><button class="ghost" id="feelNo">Cancel</button></div>
@@ -118,7 +126,7 @@
 
     <button class="row" id="breakBtn" style="background:var(--calm)">Take a break</button>
 
-    <div class="card" style="margin-top:10px">
+    <div class="card">
       <div class="muted">Right now I&hellip;</div>
       <div class="chips"><button class="ghost" data-ctx="meal">Ate a meal</button><button class="ghost" data-ctx="caffeine">Had caffeine</button>
         <button class="ghost" data-ctx="with_people">Am with people</button><button class="ghost" data-ctx="alone">Am alone</button>
@@ -128,7 +136,7 @@
 
     <h2>Launch</h2>
     <input type="text" id="search" placeholder="Search apps…" autocomplete="off">
-    <div id="apps" style="margin-top:10px"></div>
+    <div id="apps" style="margin-top:8px"></div>
 
     <h2>Feedback</h2>
     <div class="card">
