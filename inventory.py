@@ -145,7 +145,7 @@ APPS = {
     "snapchat": (["snapchat", "snap"], "https://www.snapchat.com/spotlight", "short_videos", ["short_videos"]),
     "whatsapp": (["whatsapp", "wa"], f"https://wa.me/{MESSAGE_PHONE}?text={MESSAGE_TEXT}", "group_chats",
                  ["group_chats", "intense_convo", "notifications", "work_messages", "before_sleep", "app_switching", "trusted_msg"]),
-    "gmail": (["gmail", "email", "mail"], "https://mail.google.com/", "notifications", ["notifications", "work_messages"]),
+    "gmail": (["gmail", "email", "mail"], "mailto:contact@welabs.com", "notifications", ["notifications", "work_messages"]),
     "slack": (["slack"], "https://app.slack.com/", "work_messages", ["notifications", "group_chats", "work_messages"]),
     "teams": (["microsoft teams", "teams", "ms teams"], "https://teams.microsoft.com/", "work_messages",
               ["notifications", "group_chats", "work_messages"]),
