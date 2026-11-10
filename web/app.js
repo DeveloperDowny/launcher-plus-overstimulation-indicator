@@ -484,13 +484,23 @@ function finishAction(t) {
 // Runs inside the tap, so the clipboard write is allowed; a second popup may still be
 // blocked, which is why the level card also shows a roulette button after a nudge.
 // The first launch of the day copies the morning list instead.
-function openRoulette(text, why = "Lots of overstimulation", siteOpen = false) {
+// delayMs: copy first, then wait before opening the site (the first launch of the day and the roulette "morning" mode).
+// The wait starts once the copy has finished and stays inside the browser's window after a tap for opening a tab.
+function openRoulette(text, why = "Lots of overstimulation", siteOpen = false, delayMs = 0) {
   if (!INV || !INV.roulette) return;
   text = text || INV.roulette.clipboard;
   rouletteText = text; showRoulette = true; // keep the button around in case the extra tab is blocked
-  try { navigator.clipboard.writeText(text).then(() => toast(`${why}: list copied, opening the roulette.`),
-    () => toast(`${why}: opening the roulette (couldn't copy the list).`)); } catch {}
-  if (!siteOpen) window.open(INV.roulette.url, "_blank", "noopener");
+  const open = () => { if (!siteOpen) window.open(INV.roulette.url, "_blank", "noopener"); };
+  const then = (msg) => { toast(msg); if (delayMs) setTimeout(open, delayMs); else open(); };
+  let copy;
+  try { copy = navigator.clipboard.writeText(text); } catch { copy = Promise.reject(); }
+  if (!delayMs) { // nothing to wait for: open inside the tap, as before
+    copy.then(() => toast(`${why}: list copied, opening the roulette.`), () => toast(`${why}: opening the roulette (couldn't copy the list).`));
+    open();
+  } else {
+    copy.then(() => then(`${why}: list copied. Opening the roulette in a second.`),
+      () => then(`${why}: opening the roulette (couldn't copy the list).`));
+  }
   render();
 }
 function maybeRoulette(before, after, doomscrolling = false, firstOfDay = false, siteOpen = false) {
@@ -501,7 +511,7 @@ function maybeRoulette(before, after, doomscrolling = false, firstOfDay = false,
     return true;
   }
   if (firstOfDay) {
-    openRoulette(INV.roulette && INV.roulette.morning, "First launch of the day", siteOpen);
+    openRoulette(INV.roulette && INV.roulette.morning, "First launch of the day", siteOpen, INV.roulette && INV.roulette.delayMs);
     newNudge("morning_roulette");
     return true;
   }
@@ -518,7 +528,8 @@ function openApp(appKey, actId) {
   if (!tapOk(`launch:${appKey}|${actId}`)) return;
   const a = INV.apps[appKey], act = INV.activities[actId];
   const url = INV.urlOverrides[`${appKey}|${actId}`] || a.url;
-  if (url) window.open(url, "_blank", "noopener"); // must happen synchronously inside the tap; dummy launches have no url
+  const copyMode = !!(INV.roulette && (INV.roulette.copyActivities || []).includes(actId)); // roulette "morning" mode: copy, wait, then open
+  if (url && !copyMode) window.open(url, "_blank", "noopener"); // must happen synchronously inside the tap; dummy launches have no url
   if (url && store.get("debugSessions")) sessionDiag = { app: appKey, at: performance.now(), hiddenAt: null };
   const t = beginAction("launch", { app: appKey, weight: act.weight });
   const before = settle(t);
@@ -566,7 +577,12 @@ function openApp(appKey, actId) {
     store.set("sessionStart_" + userId, String(t));
   }
   finishAction(t);
-  const nudged = maybeRoulette(before, S.level, doomscrolling, firstOfDay, appKey === "roulette");
+  let nudged;
+  if (copyMode) {
+    openRoulette(INV.roulette.morning, "Morning reflections", false, INV.roulette.delayMs);
+    if (firstOfDay) newNudge("morning_roulette");
+    nudged = true;
+  } else nudged = maybeRoulette(before, S.level, doomscrolling, firstOfDay, appKey === "roulette");
   if (!nudged && before <= 50 && S.level > 50) newNudge("loaded_band");
 }
 

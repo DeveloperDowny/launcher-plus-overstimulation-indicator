@@ -52,6 +52,7 @@ ACTIVITIES = {
     "going_to_sleep": ("Going to sleep", 0, ["bed", "gotosleep"]),
     "back_to_work":   ("Going back to work", 0, ["backtowork", "resume"]),
     "roulette":       ("Spin the calming-activity roulette", 0, ["spin", "roulette"]),
+    "roulette_morning": ("Roulette with the morning reflections list", 0, ["morning", "reflections"]),
     "clock_check":    ("Checking the clock / alarm", 0, ["clock", "alarm"]),
     "protein_breakfast": ("Protein breakfast", 0, ["proteinbreakfast"]),
     "protein_lunch":  ("Protein lunch", 0, ["proteinlunch"]),
@@ -86,7 +87,7 @@ Gently bring attention to current task, 1"""
 # copied verbatim, so the "$" stand-ins and repeated lines are as supplied
 ROULETTE_MORNING_CLIPBOARD = """As humans$ it's natural to experience challenging emotions. We can ignore them$ resist them$ or use them to better understand the mind., 1
 The more we can notice when the mind wants to be somewhere else more 'me-time' we discover in our life., 1
-By observing our resistance to challenging emotions we both suffering and prevent the emotion from escalating$, 1
+By observing our resistance to challenging emotions we both suffering and prevent the emotion from escalating, 1
 Emotions come and go$ but there's something deeper. If we listen$ we sense of inner peace and calm., 1
 It is in letting go of expectation$ allowing the mind to be free$ that we discover a sense of ease., 1
 There is nothing that is stable$ and there is nothing that can be defined. That's freedom., 1
@@ -95,10 +96,10 @@ By being clear about what meditation is not$ we create the space for what it is.
 When we live with awareness: everything looks sharper$ sounds clearer$ feels richer$ smells stronger and tastes better., 1
 We assume it's the world around us that causes that feeling of busyness$ but often$ it's the movement of our mind., 1
 It's not our external environment that dictates our happiness$ but instead$ our relationship to that environment., 1
-As long as we are attached to the idea of this and that$ we will always be limited in our experience of life$, 1
+As long as we are attached to the idea of this and that$ we will always be limited in our experience of life, 1
 In meditation$ we might give memories more weight. But letting go doesn't mean we lose them. We just find peace., 1
 So much of confusion arises from choice. When we simplify life and reduce these options we experience more clarity., 1
-Only in realizing the simple truth of our shared human condition can we discover inner and outer peace.$, 1
+Only in realizing the simple truth of our shared human condition can we discover inner and outer peace., 1
 Love for others and love for one's self are the same. We often lean toward one over the other but meditation shows us there's room for both., 1
 Finding the time to look after the mind is incredibly serious$ yet ultimately it's about taking ourselves a little less seriously., 1
 Finding the time to look after the mind is incredibly serious$ yet ultimately it's about taking ourselves a little less seriously., 1
@@ -113,7 +114,13 @@ We meditate to remind ourselves that$ like the blue sky$ our enlightened nature 
 Meditation helps us feel accepted and heard. We don't have to solve anything. We just need to listen with kindness., 1
 So long as we want a troubling emotion to leave us$ we give it renewed attention and energy to stay., 1
 does not mean we are awake. Just Just because our eyes are open$ because our eyes are closed$ does not mean we are asleep., 1
-Although the attitude of meditation is effortless$ the commitment to sit each day requires an undeniable effort$ however gentle., 1"""
+Although the attitude of meditation is effortless$ the commitment to sit each day requires an undeniable effort$ however gentle., 1
+Everything we do$ say$ and think$ impacts our world. Our potential is for change., 1
+What we do in life isn't so important. It's the way we choose to live and the way we connect with those around us that matters most., 1"""
+
+# the first launch of the day, and the roulette "morning" mode, copy the morning list, wait this long, then open the site
+ROULETTE_DELAY_S = 1.0
+ROULETTE_COPY_ACTIVITIES = ["roulette_morning"]
 
 # activities that get a bigger late-night multiplier than the default (launcher.py LATE_NIGHT_MULT)
 NIGHT_MULT = {"doomscroll": 2.0}
@@ -251,7 +258,7 @@ APPS = {
     "paytm": (["paytm"], "https://paytm.com/", "utility_task", ["utility_task"]),
     "rapido": (["rapido"], "https://rapido.bike/", "utility_task", ["utility_task"]),
     "google maps": (["google maps", "maps"], "https://www.google.com/maps", "utility_task", ["utility_task"]),
-    "roulette": (["roulette"], ROULETTE_URL, "roulette", ["roulette"]),
+    "roulette": (["roulette"], ROULETTE_URL, "roulette", ["roulette", "roulette_morning"]),
     # --- dummy launches (no url: nothing opens, the event is just logged) ---
     "sleep": (["going to sleep", "go to sleep", "sleep", "bed"], "", "going_to_sleep", ["going_to_sleep"]),
     "back to work": (["going back to work", "back to work", "work"], "", "back_to_work", ["back_to_work"]),
@@ -286,7 +293,8 @@ if __name__ == "__main__":  # regenerate web/inventory.json
         "activities": {k: {"label": l, "weight": w, "modes": m} for k, (l, w, m) in ACTIVITIES.items()},
         "apps": {k: {"aliases": a, "url": u, "default": d, "supports": sup} for k, (a, u, d, sup) in APPS.items()},
         "urlOverrides": {f"{a}|{b}": u for (a, b), u in URL_OVERRIDES.items()},
-        "roulette": {"url": ROULETTE_URL, "clipboard": ROULETTE_CLIPBOARD, "morning": ROULETTE_MORNING_CLIPBOARD},
+        "roulette": {"url": ROULETTE_URL, "clipboard": ROULETTE_CLIPBOARD, "morning": ROULETTE_MORNING_CLIPBOARD,
+                     "delayMs": int(ROULETTE_DELAY_S * 1000), "copyActivities": ROULETTE_COPY_ACTIVITIES},
         "doomscroll": {"activities": DOOMSCROLL_ACTIVITIES, "streak": DOOMSCROLL_STREAK},
         "nightMult": NIGHT_MULT,
     }
