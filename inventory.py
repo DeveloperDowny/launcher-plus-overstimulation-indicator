@@ -202,7 +202,7 @@ APPS = {
     "youtube music": (["youtube music", "ytmusic"], "https://music.youtube.com/", "calm_music", ["calm_music", "nature_sounds"]),
     "apple music": (["apple music"], "https://music.apple.com/", "calm_music", ["calm_music"]),
     "calm": (["calm app", "calm.com"], "https://www.calm.com/", "relaxation", ["relaxation", "breathing", "meditation", "nature_sounds", "sleep_audio"]),
-    "headspace": (["headspace"], "https://www.headspace.com/", "meditation", ["meditation", "breathing", "relaxation", "sleep_audio"]),
+    "headspace": (["headspace"], "https://hdsp.co/share/6af29ea1c1e253e8f497aee9", "meditation", ["meditation", "breathing", "relaxation", "sleep_audio"]),
     "medito": (["medito"], "https://meditofoundation.org/", "meditation", ["meditation", "breathing"]),
     "insight timer": (["insight timer", "insighttimer"], "https://insighttimer.com/", "meditation", ["meditation", "relaxation"]),
     "mynoise": (["mynoise"], "https://mynoise.net/", "nature_sounds", ["nature_sounds"]),
