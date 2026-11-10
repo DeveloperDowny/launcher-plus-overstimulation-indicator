@@ -9,6 +9,7 @@ import json
 import shutil
 import subprocess
 import sys
+import time
 import webbrowser
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -16,8 +17,8 @@ from typing import List, Optional
 
 import typer
 
-from inventory import (ACTIVITIES, APPS, DOOMSCROLL_ACTIVITIES, DOOMSCROLL_STREAK, NIGHT_MULT, ROULETTE_CLIPBOARD, ROULETTE_MORNING_CLIPBOARD,
-                       ROULETTE_URL,
+from inventory import (ACTIVITIES, APPS, DOOMSCROLL_ACTIVITIES, DOOMSCROLL_STREAK, NIGHT_MULT, ROULETTE_CLIPBOARD, ROULETTE_COPY_ACTIVITIES, ROULETTE_DELAY_S,
+                       ROULETTE_MORNING_CLIPBOARD, ROULETTE_URL,
                        URL_OVERRIDES)
 
 HERE = Path(__file__).parent
@@ -159,6 +160,15 @@ def copy_to_clipboard(text: str) -> bool:
     return False
 
 
+def roulette_morning() -> None:
+    """The roulette "morning" mode: copy the morning list, wait a second, open the roulette."""
+    copied = copy_to_clipboard(ROULETTE_MORNING_CLIPBOARD)
+    time.sleep(ROULETTE_DELAY_S)
+    webbrowser.open(ROULETTE_URL)
+    typer.echo(typer.style("Morning reflections. Opening the roulette", fg="green", bold=True)
+               + (" (list copied to clipboard)." if copied else "; couldn't copy, paste this list:\n" + ROULETTE_MORNING_CLIPBOARD))
+
+
 def maybe_roulette(before: float, after: float, doomscrolling: bool = False, first_of_day: bool = False,
                    site_open: bool = False) -> None:
     """Copy a list and open the roulette site when the level crosses into frayed or a doomscroll streak hits
@@ -171,6 +181,8 @@ def maybe_roulette(before: float, after: float, doomscrolling: bool = False, fir
     text = ROULETTE_CLIPBOARD if calming else ROULETTE_MORNING_CLIPBOARD
     copied = copy_to_clipboard(text)
     if not site_open:
+        if not calming:
+            time.sleep(ROULETTE_DELAY_S)  # first launch of the day: copy, wait, then open the roulette
         webbrowser.open(ROULETTE_URL)
     why = ("Lots of overstimulation" if frayed else f"{DOOMSCROLL_STREAK} doomscroll launches in a row"
            if doomscrolling else "First launch of the day")
@@ -254,7 +266,8 @@ def do_open(s: dict, text: str) -> None:
         note += f" (x{mult:g} late night: prioritise sleep)"
 
     url = URL_OVERRIDES.get((app_key, act_id), APPS[app_key][1])
-    if url:  # dummy launches (sleep, back to work) have no url and only log
+    morning_mode = act_id in ROULETTE_COPY_ACTIVITIES  # roulette "morning" mode copies, waits, then opens (below)
+    if url and not morning_mode:  # dummy launches (sleep, back to work) have no url and only log
         webbrowser.open(url)
 
     s["level"] = max(0.0, min(100.0, level_before + points))
@@ -267,7 +280,10 @@ def do_open(s: dict, text: str) -> None:
         doom_streak=s["doom_streak"], first_of_day=first_of_day)
     typer.echo(f"{'Opening' if url else 'Logged'} {app_key}: {label} (weight {weight}) {points:+.0f}%{note}")
     typer.echo(f"Level now:\n  {status_line(s['level'], s)}")
-    maybe_roulette(level_before, s["level"], doomscrolling, first_of_day, site_open=app_key == "roulette")
+    if morning_mode:
+        roulette_morning()
+    else:
+        maybe_roulette(level_before, s["level"], doomscrolling, first_of_day, site_open=app_key == "roulette")
 
 
 def do_show(s: dict) -> None:

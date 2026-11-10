@@ -52,6 +52,16 @@ ACTIVITIES = {
     "going_to_sleep": ("Going to sleep", 0, ["bed", "gotosleep"]),
     "back_to_work":   ("Going back to work", 0, ["backtowork", "resume"]),
     "roulette":       ("Spin the calming-activity roulette", 0, ["spin", "roulette"]),
+    "roulette_morning": ("Roulette with the morning reflections list", 0, ["morning", "reflections"]),
+    "clock_check":    ("Checking the clock / alarm", 0, ["clock", "alarm"]),
+    "protein_breakfast": ("Protein breakfast", 0, ["proteinbreakfast"]),
+    "protein_lunch":  ("Protein lunch", 0, ["proteinlunch"]),
+    "protein_snacks": ("Protein snacks", 0, ["proteinsnacks"]),
+    "protein_dinner": ("Protein dinner", 0, ["proteindinner"]),
+    "pickleball":     ("Pickleball", 0, ["pickleball"]),
+    "surya_namaskar": ("Surya namaskar", -3, ["suryanamaskar", "sunsalutation"]),
+    "walk":           ("Walk", -2, ["walk", "walking"]),
+    "gym":            ("Gym workout", -1, ["gym", "workout"]),
     "gita_a_day":     ("Bhagwat Gita a Day", 0, ["gita", "verse"]),
     "breakfast":      ("Breakfast", 0, ["breakfast"]),
     "lunch":          ("Lunch", 0, ["lunch"]),
@@ -77,7 +87,7 @@ Gently bring attention to current task, 1"""
 # copied verbatim, so the "$" stand-ins and repeated lines are as supplied
 ROULETTE_MORNING_CLIPBOARD = """As humans$ it's natural to experience challenging emotions. We can ignore them$ resist them$ or use them to better understand the mind., 1
 The more we can notice when the mind wants to be somewhere else more 'me-time' we discover in our life., 1
-By observing our resistance to challenging emotions we both suffering and prevent the emotion from escalating$, 1
+By observing our resistance to challenging emotions we both suffering and prevent the emotion from escalating, 1
 Emotions come and go$ but there's something deeper. If we listen$ we sense of inner peace and calm., 1
 It is in letting go of expectation$ allowing the mind to be free$ that we discover a sense of ease., 1
 There is nothing that is stable$ and there is nothing that can be defined. That's freedom., 1
@@ -86,10 +96,10 @@ By being clear about what meditation is not$ we create the space for what it is.
 When we live with awareness: everything looks sharper$ sounds clearer$ feels richer$ smells stronger and tastes better., 1
 We assume it's the world around us that causes that feeling of busyness$ but often$ it's the movement of our mind., 1
 It's not our external environment that dictates our happiness$ but instead$ our relationship to that environment., 1
-As long as we are attached to the idea of this and that$ we will always be limited in our experience of life$, 1
+As long as we are attached to the idea of this and that$ we will always be limited in our experience of life, 1
 In meditation$ we might give memories more weight. But letting go doesn't mean we lose them. We just find peace., 1
 So much of confusion arises from choice. When we simplify life and reduce these options we experience more clarity., 1
-Only in realizing the simple truth of our shared human condition can we discover inner and outer peace.$, 1
+Only in realizing the simple truth of our shared human condition can we discover inner and outer peace., 1
 Love for others and love for one's self are the same. We often lean toward one over the other but meditation shows us there's room for both., 1
 Finding the time to look after the mind is incredibly serious$ yet ultimately it's about taking ourselves a little less seriously., 1
 Finding the time to look after the mind is incredibly serious$ yet ultimately it's about taking ourselves a little less seriously., 1
@@ -104,7 +114,13 @@ We meditate to remind ourselves that$ like the blue sky$ our enlightened nature 
 Meditation helps us feel accepted and heard. We don't have to solve anything. We just need to listen with kindness., 1
 So long as we want a troubling emotion to leave us$ we give it renewed attention and energy to stay., 1
 does not mean we are awake. Just Just because our eyes are open$ because our eyes are closed$ does not mean we are asleep., 1
-Although the attitude of meditation is effortless$ the commitment to sit each day requires an undeniable effort$ however gentle., 1"""
+Although the attitude of meditation is effortless$ the commitment to sit each day requires an undeniable effort$ however gentle., 1
+Everything we do$ say$ and think$ impacts our world. Our potential is for change., 1
+What we do in life isn't so important. It's the way we choose to live and the way we connect with those around us that matters most., 1"""
+
+# the first launch of the day, and the roulette "morning" mode, copy the morning list, wait this long, then open the site
+ROULETTE_DELAY_S = 1.0
+ROULETTE_COPY_ACTIVITIES = ["roulette_morning"]
 
 # activities that get a bigger late-night multiplier than the default (launcher.py LATE_NIGHT_MULT)
 NIGHT_MULT = {"doomscroll": 2.0}
@@ -113,6 +129,10 @@ NIGHT_MULT = {"doomscroll": 2.0}
 # triggers the same roulette nudge as hitting the frayed band
 DOOMSCROLL_ACTIVITIES = ["short_videos", "social_profiles", "news", "doomscroll", "obsessive_scroll"]
 DOOMSCROLL_STREAK = 3
+
+# the person the messenger launches write to, as an international number without "+" (country code first)
+MESSAGE_PHONE = "911234569899"
+MESSAGE_TEXT = "Hi"
 
 # app key -> (aliases typed by user, url, default activity, [activities it supports])
 APPS = {
@@ -123,16 +143,16 @@ APPS = {
                  "nature_sounds", "nature_visuals", "relaxation", "stretching", "meditation", "calm_music"]),
     "tiktok": (["tiktok"], "https://www.tiktok.com/", "short_videos", ["short_videos", "loud_video"]),
     "snapchat": (["snapchat", "snap"], "https://www.snapchat.com/spotlight", "short_videos", ["short_videos"]),
-    "whatsapp": (["whatsapp", "wa"], "https://web.whatsapp.com/", "group_chats",
+    "whatsapp": (["whatsapp", "wa"], f"https://wa.me/{MESSAGE_PHONE}?text={MESSAGE_TEXT}", "group_chats",
                  ["group_chats", "intense_convo", "notifications", "work_messages", "before_sleep", "app_switching", "trusted_msg"]),
-    "gmail": (["gmail", "email", "mail"], "https://mail.google.com/", "notifications", ["notifications", "work_messages"]),
+    "gmail": (["gmail", "email", "mail"], "mailto:contact@welabs.com", "notifications", ["notifications", "work_messages"]),
     "slack": (["slack"], "https://app.slack.com/", "work_messages", ["notifications", "group_chats", "work_messages"]),
     "teams": (["microsoft teams", "teams", "ms teams"], "https://teams.microsoft.com/", "work_messages",
               ["notifications", "group_chats", "work_messages"]),
-    "telegram": (["telegram"], "https://web.telegram.org/", "group_chats", ["group_chats", "intense_convo"]),
+    "telegram": (["telegram"], f"https://t.me/+{MESSAGE_PHONE}", "group_chats", ["group_chats", "intense_convo"]),
     "discord": (["discord"], "https://discord.com/app", "group_chats", ["group_chats", "work_messages"]),
     "messenger": (["messenger"], "https://www.messenger.com/", "intense_convo", ["intense_convo"]),
-    "imessage": (["imessage"], "https://www.icloud.com/", "intense_convo", ["intense_convo"]),
+    "imessage": (["imessage"], f"sms:+{MESSAGE_PHONE}?&body={MESSAGE_TEXT}", "intense_convo", ["intense_convo"]),
     "chrome": (["chrome"], "https://www.google.com/", "app_switching", ["app_switching", "doomscroll", "obsessive_scroll"]),
     "brave": (["brave"], "https://search.brave.com/", "app_switching", ["app_switching", "doomscroll", "obsessive_scroll"]),
     "duckduckgo": (["duck duck go", "duckduckgo", "ddg"], "https://duckduckgo.com/", "app_switching", ["app_switching", "doomscroll", "obsessive_scroll"]),
@@ -182,7 +202,7 @@ APPS = {
     "youtube music": (["youtube music", "ytmusic"], "https://music.youtube.com/", "calm_music", ["calm_music", "nature_sounds"]),
     "apple music": (["apple music"], "https://music.apple.com/", "calm_music", ["calm_music"]),
     "calm": (["calm app", "calm.com"], "https://www.calm.com/", "relaxation", ["relaxation", "breathing", "meditation", "nature_sounds", "sleep_audio"]),
-    "headspace": (["headspace"], "https://www.headspace.com/", "meditation", ["meditation", "breathing", "relaxation", "sleep_audio"]),
+    "headspace": (["headspace"], "https://hdsp.co/share/6af29ea1c1e253e8f497aee9", "meditation", ["meditation", "breathing", "relaxation", "sleep_audio"]),
     "medito": (["medito"], "https://meditofoundation.org/", "meditation", ["meditation", "breathing"]),
     "insight timer": (["insight timer", "insighttimer"], "https://insighttimer.com/", "meditation", ["meditation", "relaxation"]),
     "mynoise": (["mynoise"], "https://mynoise.net/", "nature_sounds", ["nature_sounds"]),
@@ -208,17 +228,37 @@ APPS = {
     "yoga with adriene": (["yoga with adriene", "adriene"], "https://yogawithadriene.com/", "stretching", ["stretching"]),
     "timer": (["timer", "google timer"], "https://www.google.com/search?q=timer", "screen_timer", ["screen_timer"]),
     "forest": (["forest"], "https://www.forestapp.cc/", "screen_timer", ["screen_timer"]),
-    "signal": (["signal"], "https://signal.org/", "trusted_msg", ["trusted_msg"]),
+    "signal": (["signal"], f"https://signal.me/#p/+{MESSAGE_PHONE}", "trusted_msg", ["trusted_msg"]),
     "reading": (["reading", "physical book", "book"], "", "reading", ["reading", "reading_bedtime"]),
     "play store": (["google play store", "play store", "playstore"], "https://play.google.com/store/apps", "shopping", ["shopping"]),
     "app store": (["apple app store", "app store", "appstore"], "https://apps.apple.com/", "shopping", ["shopping"]),
     "cal ai": (["cal ai", "calai", "calorie tracker"], "https://www.calai.app/", "utility_task", ["utility_task"]),
+    # --- phone built-ins (dummy: a web page can't open native apps, so these only log) ---
+    "phone": (["phone", "dialer", "call"], "", "utility_task", ["utility_task"]),
+    "contacts": (["contacts"], "", "utility_task", ["utility_task"]),
+    "messages": (["messages", "sms", "text"], "", "utility_task", ["utility_task"]),
+    "clock": (["clock", "alarm", "stopwatch"], "", "clock_check", ["clock_check"]),
+    "camera": (["camera"], "", "utility_task", ["utility_task"]),
+    "calculator": (["calculator", "calc"], "", "utility_task", ["utility_task"]),
+    "calendar": (["calendar"], "", "utility_task", ["utility_task"]),
+    "weather": (["weather"], "", "utility_task", ["utility_task"]),
+    "files": (["files", "file manager"], "", "utility_task", ["utility_task"]),
+    "settings": (["settings"], "", "utility_task", ["utility_task"]),
+    # --- meals and movement (dummy: log only) ---
+    "protein breakfast": (["protein breakfast", "protien breakfast"], "", "protein_breakfast", ["protein_breakfast"]),
+    "protein lunch": (["protein lunch", "protien lunch"], "", "protein_lunch", ["protein_lunch"]),
+    "protein snacks": (["protein snacks", "protein snack", "protien snacks", "protien snack"], "", "protein_snacks", ["protein_snacks"]),
+    "protein dinner": (["protein dinner", "protien dinner"], "", "protein_dinner", ["protein_dinner"]),
+    "surya namaskar": (["surya namaskar", "suryanamaskar", "sun salutation"], "", "surya_namaskar", ["surya_namaskar"]),
+    "pickleball": (["pickleball"], "", "pickleball", ["pickleball"]),
+    "gym": (["gym", "workout"], "", "gym", ["gym"]),
+    "walk": (["walk", "walking"], "", "walk", ["walk"]),
     "gpay": (["google pay", "gpay"], "https://pay.google.com/", "utility_task", ["utility_task"]),
     "phonepe": (["phonepe"], "https://www.phonepe.com/", "utility_task", ["utility_task"]),
     "paytm": (["paytm"], "https://paytm.com/", "utility_task", ["utility_task"]),
     "rapido": (["rapido"], "https://rapido.bike/", "utility_task", ["utility_task"]),
     "google maps": (["google maps", "maps"], "https://www.google.com/maps", "utility_task", ["utility_task"]),
-    "roulette": (["roulette"], ROULETTE_URL, "roulette", ["roulette"]),
+    "roulette": (["roulette"], ROULETTE_URL, "roulette", ["roulette", "roulette_morning"]),
     # --- dummy launches (no url: nothing opens, the event is just logged) ---
     "sleep": (["going to sleep", "go to sleep", "sleep", "bed"], "", "going_to_sleep", ["going_to_sleep"]),
     "back to work": (["going back to work", "back to work", "work"], "", "back_to_work", ["back_to_work"]),
@@ -253,7 +293,8 @@ if __name__ == "__main__":  # regenerate web/inventory.json
         "activities": {k: {"label": l, "weight": w, "modes": m} for k, (l, w, m) in ACTIVITIES.items()},
         "apps": {k: {"aliases": a, "url": u, "default": d, "supports": sup} for k, (a, u, d, sup) in APPS.items()},
         "urlOverrides": {f"{a}|{b}": u for (a, b), u in URL_OVERRIDES.items()},
-        "roulette": {"url": ROULETTE_URL, "clipboard": ROULETTE_CLIPBOARD, "morning": ROULETTE_MORNING_CLIPBOARD},
+        "roulette": {"url": ROULETTE_URL, "clipboard": ROULETTE_CLIPBOARD, "morning": ROULETTE_MORNING_CLIPBOARD,
+                     "delayMs": int(ROULETTE_DELAY_S * 1000), "copyActivities": ROULETTE_COPY_ACTIVITIES},
         "doomscroll": {"activities": DOOMSCROLL_ACTIVITIES, "streak": DOOMSCROLL_STREAK},
         "nightMult": NIGHT_MULT,
     }
