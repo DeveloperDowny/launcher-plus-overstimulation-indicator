@@ -54,6 +54,7 @@ ACTIVITIES = {
     "roulette":       ("Spin the calming-activity roulette", 0, ["spin", "roulette"]),
     "roulette_morning": ("Roulette with the morning reflections list", 0, ["morning", "reflections"]),
     "clock_check":    ("Checking the clock / alarm", 0, ["clock", "alarm"]),
+    "travel_log":     ("Travel log", 0, ["travel", "journey"]),
     "protein_breakfast": ("Protein breakfast", 0, ["proteinbreakfast"]),
     "protein_lunch":  ("Protein lunch", 0, ["proteinlunch"]),
     "protein_snacks": ("Protein snacks", 0, ["proteinsnacks"]),
@@ -253,6 +254,9 @@ APPS = {
     "pickleball": (["pickleball"], "", "pickleball", ["pickleball"]),
     "gym": (["gym", "workout"], "", "gym", ["gym"]),
     "walk": (["walk", "walking"], "", "walk", ["walk"]),
+    # RailOne has no web app; this is the Play Store search for it (no verified direct store link)
+    "railone": (["railone", "rail one", "indian railways"], "https://play.google.com/store/search?q=railone&c=apps", "utility_task", ["utility_task"]),
+    "travel log": (["travel log", "travel", "commute", "journey"], "", "travel_log", ["travel_log"]),
     "gpay": (["google pay", "gpay"], "https://pay.google.com/", "utility_task", ["utility_task"]),
     "phonepe": (["phonepe"], "https://www.phonepe.com/", "utility_task", ["utility_task"]),
     "paytm": (["paytm"], "https://paytm.com/", "utility_task", ["utility_task"]),
