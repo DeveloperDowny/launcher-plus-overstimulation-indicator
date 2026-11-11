@@ -206,7 +206,10 @@ function idleRest(t) {
 }
 function decayed(t = now()) {
   if (S.breakStartedAt != null) return restOutcome(S.levelAtBreakStart, (t - S.breakStartedAt) / MIN, REST_CAP_MIN, t).after; // projected
-  if (S.session && S.session.weight > 0) return S.level; // B1: no decay while still in a stimulating app
+  if (S.session && S.session.weight > 0) { // B1: no decay while still in a stimulating app, up to its default length
+    const past = (t - S.session.startedAt) / MIN - defaultMinFor(S.session.app); // beyond that nobody knows it's still going on
+    return past <= 0 ? S.level : Math.max(0, S.level - DECAY_PER_MIN * past);
+  }
   const rest = idleRest(t);
   if (rest) return rest.after; // what the next action will log; frozen once the cap is reached
   return Math.max(0, S.level - DECAY_PER_MIN * Math.max(0, t - S.updatedAt) / MIN);
@@ -705,8 +708,11 @@ function answerMorning(tag, value) {
 function skipMorning() { store.set("morningDone_" + userId, currentWakeDay()); render(); }
 function morningDue(t) {
   const doneDay = store.get("morningDone_" + userId);
-  const resting = S.restStartAt != null && !S.session && !pendingSession && S.breakStartedAt == null;
-  const byGap = resting && (t - S.restStartAt) / MIN >= SLEEP_GAP_MIN && doneDay !== wakeDayOf(t);
+  // a launch that never closed (a meal logged before bed, no link to come back from) must not hide the morning card
+  const restStart = S.session ? S.session.startedAt : S.restStartAt;
+  const resting = restStart != null && !pendingSession && S.breakStartedAt == null
+    && (!S.session || (t - S.session.startedAt) / MIN >= SLEEP_GAP_MIN);
+  const byGap = resting && (t - restStart) / MIN >= SLEEP_GAP_MIN && doneDay !== wakeDayOf(t);
   const byWake = S.lastWakeDay != null && S.lastWakeDay === S.wakeDay && doneDay !== S.wakeDay;
   return byGap || byWake;
 }
@@ -727,7 +733,7 @@ function render() {
   $("rouletteBtn").hidden = !(name === "frayed" || showRoulette);
   const onBreak = S.breakStartedAt != null, breakMin = onBreak ? Math.floor((t - S.breakStartedAt) / MIN) : 0;
   $("since").textContent = onBreak ? `On a break · ${breakMin} min`
-    : S.session ? `In ${S.session.app} · ${Math.floor((t - S.session.startedAt) / MIN)} min`
+    : S.session && (t - S.session.startedAt) / MIN <= SESSION_MAX_MIN ? `In ${S.session.app} · ${Math.floor((t - S.session.startedAt) / MIN)} min`
     : S.lastBreakAt ? `${minsSinceBreak()} min since last break` : `No break yet (${minsSinceBreak()} min since you started)`;
   $("breakBtn").textContent = onBreak ? `End break · ${breakMin} min · Counts up to ${REST_CAP_MIN} min. Full effect at ${BREAK_FULL_MIN} min.` : "Take a break";
   $("sessQ").hidden = !pendingSession;
