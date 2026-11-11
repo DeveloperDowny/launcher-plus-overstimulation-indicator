@@ -123,6 +123,10 @@ What we do in life isn't so important. It's the way we choose to live and the wa
 ROULETTE_DELAY_S = 1.0
 ROULETTE_COPY_ACTIVITIES = ["roulette_morning"]
 
+# streaming (OTT) apps: when the real length of a session is unknown, assume this long instead of the default 20 min
+OTT_APPS = ["netflix", "prime video", "hotstar", "sonyliv", "zee5", "mx player", "disney+", "apple tv", "hbo max", "hulu", "crunchyroll"]
+OTT_DEFAULT_SESSION_MIN = 45
+
 # activities that get a bigger late-night multiplier than the default (launcher.py LATE_NIGHT_MULT)
 NIGHT_MULT = {"doomscroll": 2.0}
 
@@ -301,6 +305,7 @@ if __name__ == "__main__":  # regenerate web/inventory.json
                      "delayMs": int(ROULETTE_DELAY_S * 1000), "copyActivities": ROULETTE_COPY_ACTIVITIES},
         "doomscroll": {"activities": DOOMSCROLL_ACTIVITIES, "streak": DOOMSCROLL_STREAK},
         "nightMult": NIGHT_MULT,
+        "sessionDefaultMin": {app: OTT_DEFAULT_SESSION_MIN for app in OTT_APPS},
     }
     Path(__file__).with_name("web").joinpath("inventory.json").write_text(json.dumps(out), encoding="utf-8")
     print(f"wrote {len(out['activities'])} activities, {len(out['apps'])} apps")

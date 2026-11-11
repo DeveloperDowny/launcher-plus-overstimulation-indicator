@@ -32,6 +32,7 @@ const SESSION_GRACE_MIN = 5;        // first 5 min of a session are covered by t
 const PER_MIN_PER_WEIGHT = 0.1;     // per-minute cost after grace = weight * this (* late-night mult)
 const SESSION_DEFAULT_MIN = 20;     // assumed session length when the real length is unknown
 const SESSION_MAX_MIN = 90;         // upper bound for "the whole time" answers
+// every launch except "going to sleep" (that's rest, the wake event covers it) opens a session, so its time is recorded
 // penalties (B3, B4)
 const CHECK_REPEATS = 3;            // same app this many times...
 const CHECK_WINDOW_MIN = 10;        // ...within this many minutes = checking loop
@@ -100,6 +101,7 @@ function freshState(t) {
     lastSwitchPenaltyAt: null, lastCheckPenaltyAt: {}, doomStreak: 0, lastOpenWakeDay: null,
     session: null,                     // {app, activity, weight, mult, startedAt, levelAtStart, launchPoints, device}
     lastClosedSessionKey: null,        // "<startedAt>|<app>" of the last session_end, so a session is closed once
+    orphan: null,                      // a launch from long ago whose session_end was never logged; closed with the default length
     breakStartedAt: null, levelAtBreakStart: null, restStartAt: null,
     wakeDay: null, lastWakeDay: null, wakeAt: null, lastSleepLogAt: null,
     sleepQuality: null,                // {day, value} from the morning card
@@ -166,6 +168,8 @@ async function loadInventory() {
   if (cached) { try { INV = JSON.parse(cached); if (INV.doomscroll) DOOM = INV.doomscroll; diag("Couldn't refresh the app list; using a saved copy."); return INV; } catch {} }
   throw new Error("Couldn't load the app list (inventory.json): " + ((lastErr && lastErr.message) || lastErr));
 }
+// how long a session counts when its real end is unknown: 20 min, or 45 for streaming apps (inventory sessionDefaultMin)
+const defaultMinFor = (app) => (INV && INV.sessionDefaultMin && INV.sessionDefaultMin[app]) || SESSION_DEFAULT_MIN;
 const nightMultFor = (actId) => (INV && INV.nightMult && INV.nightMult[actId]) || LATE_NIGHT_MULT;
 
 // ---------- level ----------
@@ -232,14 +236,16 @@ function deriveState(events, nowMs, firstTs = null) {
   }
   // a rest resets the switching/checking windows and the doomscroll streak (pre-change "break" rows were instant rests)
   const isRest = (e) => ["break_end", "auto_break", "wake"].includes(e.event) || (e.event === "break" && !e.scoring_version);
-  for (const e of ev) { // open session: newest launch with a url and a weight, not closed by anything later
+  for (const e of ev) { // open session: newest launch not closed by anything later (a bedtime log opens none)
     if (["session_end", "break", "break_end", "auto_break", "wake", "feel"].includes(e.event)) break;
     if (e.event !== "open") continue;
-    if (e.url && e.weight && nowMs - e.t < SESSION_MAX_MIN * MIN) {
+    if (e.activity !== "going_to_sleep") {
       const mult = e.weight > 0 && lateNight(new Date(e.t)) ? nightMultFor(e.activity) : 1;
-      st.session = { app: e.app, activity: e.activity, weight: e.weight, levelAtStart: e.level_after, startedAt: e.t,
-        mult, launchPoints: e.weight * POINTS_PER_WEIGHT * mult,
+      const snap = { app: e.app, activity: e.activity, weight: e.weight || 0, levelAtStart: e.level_after, startedAt: e.t,
+        mult, launchPoints: (e.weight || 0) * POINTS_PER_WEIGHT * mult,
         device: +store.get("sessionStart_" + e.user_id) === e.t ? DEVICE_ID : null };
+      if (nowMs - e.t < SESSION_MAX_MIN * MIN) st.session = snap;
+      else st.orphan = snap; // nobody came back to close it: log it with the default length at the next action
     }
     break;
   }
@@ -360,10 +366,16 @@ function closeSession(t, reason) { // reason: return | next_action
   if (!snap) return;
   S.session = null;
   if (S.lastClosedSessionKey === sessionKey(snap)) return;
-  const gap = (t - snap.startedAt) / MIN;
-  if (gap <= SESSION_DEFAULT_MIN) return logSessionEnd(snap, gap, reason);
-  if (reason === "return") { pendingSession = { snap, gap }; applySession(snap, SESSION_DEFAULT_MIN); return; } // ask; 20 min until answered
-  logSessionEnd(snap, SESSION_DEFAULT_MIN, "default");
+  const gap = (t - snap.startedAt) / MIN, dflt = defaultMinFor(snap.app);
+  if (gap <= dflt) return logSessionEnd(snap, gap, reason);
+  if (reason === "return") { pendingSession = { snap, gap }; applySession(snap, dflt); return; } // ask; the default until answered
+  logSessionEnd(snap, dflt, "default");
+}
+function closeOrphan() { // a launch from a past visit that was never closed: its end is unknown, so the default length counts
+  const snap = S.orphan;
+  if (!snap) return;
+  S.orphan = null;
+  logSessionEnd(snap, defaultMinFor(snap.app), "default");
 }
 function resolvePending(minutes, endedBy) {
   const p = pendingSession;
@@ -467,7 +479,8 @@ function beginAction(kind, d = {}) { // kind: launch | break | feel | context | 
   const t = now(), lastEventBefore = S.lastEventAt;
   if (!acting) { acting = true; queueMicrotask(() => { acting = false; render(); }); } // runs once the whole tap is done
   if (kind !== "context") { // context chips don't close a session or end a break
-    if (pendingSession) resolvePending(SESSION_DEFAULT_MIN, "default");
+    if (pendingSession) resolvePending(defaultMinFor(pendingSession.snap.app), "default");
+    closeOrphan();
     closeSession(t, "next_action");
     if (kind !== "break") endBreak(t);
   }
@@ -571,7 +584,7 @@ function openApp(appKey, actId) {
     weight: act.weight, points_added: round1(points), switch_penalty: round1(sw), check_penalty: round1(ck * mult),
     repeat_count: repeat, url });
   toast(`${appKey}: ${points > 0 ? "+" : ""}${Math.round(points)}%${sw ? " (app-switching penalty)" : ""}${ck ? " (checking loop)" : ""}${mult > 1 ? " (late night x" + mult + ": prioritise sleep)" : ""}`);
-  if (url && act.weight !== 0) { // the time spent in the app is costed when you come back (sessions)
+  if (actId !== "going_to_sleep") { // the time spent is costed when you come back or act again (sessions); weight 0 and no-link launches count too
     S.session = { app: appKey, activity: actId, weight: act.weight, mult, startedAt: t, levelAtStart: S.level,
       launchPoints: act.weight * POINTS_PER_WEIGHT * mult, device: DEVICE_ID }; // launchPoints: what a glance hands half of back
     store.set("sessionStart_" + userId, String(t));
@@ -816,7 +829,7 @@ function wire() {
   $("breakBtn").onclick = takeBreak; $("fbBtn").onclick = sendText;
   document.querySelectorAll("[data-acc]").forEach((b) => (b.onclick = () => sendAccuracy(b.dataset.acc === "1")));
   document.querySelectorAll("[data-sess]").forEach((b) => (b.onclick = () => answerSession(b.dataset.sess)));
-  $("sessDismiss").onclick = () => { resolvePending(SESSION_DEFAULT_MIN, "default"); render(); };
+  $("sessDismiss").onclick = () => { if (pendingSession) resolvePending(defaultMinFor(pendingSession.snap.app), "default"); render(); };
   document.querySelectorAll("[data-morning]").forEach((b) => (b.onclick = () => answerMorning(...b.dataset.morning.split(":"))));
   $("morningSkip").onclick = skipMorning;
   document.querySelectorAll("[data-ctx]").forEach((b) => (b.onclick = () => tapContext(b.dataset.ctx, "yes")));
