@@ -90,10 +90,13 @@
   <div class="card row" style="margin-top:10px">
     <label class="muted" for="day">Day</label>
     <select id="day"></select>
-    <label class="muted" for="cmp" style="margin-left:6px">Compare with</label>
-    <select id="cmp"></select>
     <span style="flex:1"></span>
     <button class="primary" id="runBtn">Run analysis</button>
+  </div>
+  <!-- secondary: the report stands on its own; comparing is opt-in -->
+  <div class="row muted" style="margin:-2px 2px 4px">
+    <label for="cmp">Compare (optional)</label>
+    <select id="cmp" style="font-size:13px;padding:4px 8px"></select>
   </div>
   <div id="status" class="muted"></div>
 
@@ -136,8 +139,10 @@
       <div><h2>Nudges</h2><div class="card" id="nudges"></div></div>
     </div>
 
-    <h2>Compared</h2>
-    <div class="card scroll" id="compareTable"></div>
+    <div id="compareSection" hidden>
+      <h2>Compared</h2>
+      <div class="card scroll" id="compareTable"></div>
+    </div>
 
     <h2>Logging problems</h2>
     <div class="card"><ul id="problems" style="margin:0;padding-left:18px"></ul></div>

@@ -704,7 +704,8 @@ function renderNudges(a) {
 
 function renderCompare(a, cmp) {
   const box = $("compareTable"); box.replaceChildren();
-  if (!cmp) { box.append(el("div", { class: "muted" }, "Pick a day, the average or the median in \"Compare with\" to see differences here.")); return; }
+  $("compareSection").hidden = !cmp;
+  if (!cmp) return;
   const s = numbers(a), c = cmp.summary;
   const rows = [["Launches", "launches"], ["Net launch points", "net"], ["Points added", "added"], ["Points removed", "removed"], ["Glance refunds", "glance"],
     ["After refunds", "effective"], ["Peak level", "peakLevel"], ["Time in apps (min)", "timeInApps"], ["Frayed launches", "frayed"],
@@ -731,7 +732,7 @@ function render(saved) {
   const mo = $("moments"); mo.replaceChildren();
   for (const m of A.moments) { const li = el("li"); li.append(el("span", { class: "tm" }, fmtT(m.t)), m.text); mo.append(li); }
   if (!A.moments.length) mo.append(el("li", { class: "muted" }, "Nothing stood out."));
-  // takeaways are saved with the day; the comparison line follows the current "Compare with" choice
+  // takeaways are saved with the day; a comparison line is added only when a comparison is picked
   const tk = $("takeaways"); tk.replaceChildren();
   for (const t of takeaways(A, cmp)) tk.append(el("li", {}, t));
   const pr = $("problems"); pr.replaceChildren();
@@ -757,7 +758,7 @@ function fillCompare() {
     sel.append(el("option", { value: "mean" }, `Average of the ${prior.length} days before`), el("option", { value: "median" }, `Median of the ${prior.length} days before`));
   }
   for (const k of [...DAYS.keys()].sort().reverse()) if (k !== day) sel.append(el("option", { value: k }, fmtDay(k)));
-  sel.value = [...sel.options].some((o) => o.value === cur) ? cur : prior.length ? prior[prior.length - 1] : "none";
+  sel.value = [...sel.options].some((o) => o.value === cur) ? cur : "none"; // the day stands alone unless you pick a comparison
 }
 async function showDay() {
   const day = $("day").value;
