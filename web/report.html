@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1a1a19">
+<title>Day Report</title>
+<style>
+  /* chart tokens: dataviz reference palette (status colors carry the bands, always with their names) */
+  :root { color-scheme: light;
+    --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781; --grid:#e1e0d9; --axis:#c3c2b7;
+    --ring:rgba(11,11,11,0.10); --accent:#4f46e5; --up:#006300;
+    --calm:#0ca30c; --steady:#fab219; --loaded:#ec835a; --frayed:#d03b3b;
+    --added:#e34948; --removed:#2a78d6; --neutral:#898781; --night:rgba(11,11,11,0.035); }
+  @media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) { color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --ink:#f0efec; --ink-2:#c3c2b7; --muted:#898781; --grid:#2c2c2a; --axis:#383835;
+    --ring:rgba(255,255,255,0.10); --accent:#818cf8; --up:#0ca30c;
+    --added:#e66767; --removed:#3987e5; --night:rgba(255,255,255,0.035); } }
+  :root[data-theme="dark"] { color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --ink:#f0efec; --ink-2:#c3c2b7; --muted:#898781; --grid:#2c2c2a; --axis:#383835;
+    --ring:rgba(255,255,255,0.10); --accent:#818cf8; --up:#0ca30c; --added:#e66767; --removed:#3987e5; --night:rgba(255,255,255,0.035); }
+  [hidden] { display:none !important; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; background:var(--page); color:var(--ink); }
+  main { max-width:980px; margin:0 auto; padding:10px 14px 40px; }
+  a { color:var(--accent); }
+  h1 { font-size:20px; margin:4px 0 2px; }
+  h2 { font-size:13px; margin:18px 0 6px; color:var(--ink-2); text-transform:uppercase; letter-spacing:.04em; }
+  .card { background:var(--surface); border:1px solid var(--ring); border-radius:12px; padding:12px; margin-bottom:10px; }
+  .muted { color:var(--muted); font-size:13px; }
+  .sub { color:var(--ink-2); font-size:13px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .spread { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
+  select, button { font:inherit; font-size:14px; border-radius:9px; padding:7px 10px; border:1px solid var(--ring);
+    background:var(--surface); color:var(--ink); }
+  button.primary { background:var(--accent); color:#fff; border:0; cursor:pointer; }
+  button.ghost { cursor:pointer; color:var(--accent); }
+  button:disabled { opacity:.5; cursor:wait; }
+  /* KPI tiles */
+  .tiles { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:8px; }
+  .tile { background:var(--surface); border:1px solid var(--ring); border-radius:12px; padding:10px 12px; }
+  .tile .k { font-size:12px; color:var(--ink-2); }
+  .tile .v { font-size:24px; font-weight:650; line-height:1.15; }
+  .tile .d { font-size:12px; color:var(--muted); }
+  .chip { display:inline-flex; align-items:center; gap:5px; font-size:12px; padding:2px 8px; border-radius:999px;
+    border:1px solid var(--ring); color:var(--ink-2); white-space:nowrap; }
+  .sw { display:inline-block; width:10px; height:10px; border-radius:2px; }
+  .key { display:inline-block; width:14px; height:2px; vertical-align:middle; }
+  /* charts */
+  .scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  svg text { font:11px system-ui,-apple-system,"Segoe UI",sans-serif; fill:var(--muted); }
+  svg .lbl { fill:var(--ink-2); }
+  .tip { position:fixed; z-index:20; pointer-events:none; background:var(--surface); color:var(--ink); border:1px solid var(--ring);
+    border-radius:10px; padding:8px 10px; font-size:13px; box-shadow:0 6px 24px rgba(0,0,0,.18); max-width:280px; }
+  .tip .t { color:var(--muted); font-size:12px; }
+  .tip .big { font-weight:650; }
+  .tip .ln { margin-top:5px; padding-top:5px; border-top:1px solid var(--ring); }
+  /* lists */
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:5px 6px; border-bottom:1px solid var(--grid); vertical-align:top; }
+  th { color:var(--ink-2); font-weight:600; }
+  td.n, th.n { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .moments li { margin:0 0 6px; } .moments { padding-left:0; list-style:none; margin:0; }
+  .moments .tm { display:inline-block; min-width:68px; color:var(--ink-2); font-variant-numeric:tabular-nums; }
+  .check { display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid var(--grid); }
+  .check:last-child { border-bottom:0; }
+  .box { width:22px; height:22px; border-radius:6px; border:2px solid var(--axis); display:grid; place-items:center; flex:none; font-weight:700; }
+  .box.on { background:var(--calm); border-color:var(--calm); color:#fff; }
+  .grid7 { display:grid; grid-template-columns:auto repeat(7, 1fr); gap:3px; font-size:11px; align-items:center; }
+  .grid7 .c { height:18px; border-radius:4px; background:var(--grid); display:grid; place-items:center; color:#fff; font-weight:700; }
+  .grid7 .c.on { background:var(--calm); }
+  .two { display:grid; grid-template-columns:1fr; gap:10px; }
+  @media (min-width:760px) { .two { grid-template-columns:1fr 1fr; } }
+  details summary { cursor:pointer; color:var(--accent); font-size:13px; margin-top:6px; }
+  #status { min-height:20px; }
+  .err { color:var(--frayed); }
+  .stale { opacity:.55; transition:opacity .2s; }
+</style>
+</head>
+<body>
+<main>
+  <div class="spread">
+    <div><a href="./">&larr; Launcher</a></div>
+    <div class="muted" id="who"></div>
+  </div>
+  <h1>Overstimulation day report</h1>
+  <div class="sub" id="dayline">Pick a day.</div>
+
+  <!-- filters: one row, above everything they scope -->
+  <div class="card row" style="margin-top:10px">
+    <label class="muted" for="day">Day</label>
+    <select id="day"></select>
+    <label class="muted" for="cmp" style="margin-left:6px">Compare with</label>
+    <select id="cmp"></select>
+    <span style="flex:1"></span>
+    <button class="primary" id="runBtn">Run analysis</button>
+  </div>
+  <div id="status" class="muted"></div>
+
+  <div id="report" hidden>
+    <div class="tiles" id="tiles"></div>
+
+    <h2>Timeline</h2>
+    <div class="card">
+      <div class="spread"><div class="row" id="tlLegend"></div>
+        <label class="muted"><input type="checkbox" id="fullDay"> Full 24 h</label></div>
+      <div class="scroll" id="tlWrap"></div>
+      <details><summary>Show every launch as a table</summary><div class="scroll" id="launchTable"></div></details>
+    </div>
+
+    <div class="two">
+      <div>
+        <h2>Time in each band</h2>
+        <div class="card" id="bandBars"></div>
+      </div>
+      <div>
+        <h2>Dimensions</h2>
+        <div class="card"><div id="dims"></div><div class="muted" style="margin:10px 0 4px">Last 7 days</div><div id="dims7"></div></div>
+      </div>
+    </div>
+
+    <h2>Points by hour</h2>
+    <div class="card"><div class="row" id="hourLegend" style="margin-bottom:4px"></div><div class="scroll" id="hourChart"></div>
+      <details><summary>Show as a table</summary><div class="scroll" id="hourTable"></div></details></div>
+
+    <div class="two">
+      <div><h2>By app</h2><div class="card" id="apps"></div></div>
+      <div><h2>Check-ins: felt vs tracker</h2><div class="card" id="feels"></div></div>
+    </div>
+
+    <h2>Key moments</h2>
+    <div class="card"><ul class="moments" id="moments"></ul></div>
+
+    <div class="two">
+      <div><h2>Takeaways</h2><div class="card"><ul id="takeaways" style="margin:0;padding-left:18px"></ul></div></div>
+      <div><h2>Nudges</h2><div class="card" id="nudges"></div></div>
+    </div>
+
+    <h2>Compared</h2>
+    <div class="card scroll" id="compareTable"></div>
+
+    <h2>Logging problems</h2>
+    <div class="card"><ul id="problems" style="margin:0;padding-left:18px"></ul></div>
+
+    <div class="muted" id="savedNote" style="margin-top:12px"></div>
+  </div>
+</main>
+<div class="tip" id="tip" hidden></div>
+<script src="config.js"></script>
+<script src="report.js"></script>
+</body>
+</html>
