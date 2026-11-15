@@ -129,7 +129,16 @@ async function sbPost(table, row) {
   flush();
 }
 let flushing = false;
-async function flush() { // simple offline-tolerant queue
+// the queue is shared by every tab on this device, so only one tab may post from it at a time
+// (with a per-tab lock alone, two open tabs posted the same queued row twice)
+function flush() {
+  if (!(navigator.locks && navigator.locks.request)) return flushQueue();
+  navigator.locks.request("osl-flush", { ifAvailable: true }, (lock) => {
+    if (!lock) { setTimeout(flush, 1500); return; } // another tab is posting; check back for rows it may miss
+    return flushQueue();
+  }).catch(() => {});
+}
+async function flushQueue() { // simple offline-tolerant queue
   if (flushing) return;
   flushing = true;
   try {
@@ -312,6 +321,7 @@ function log(event, before, after, extra = {}) {
     break_taken_yet: S.lastBreakAt != null, wake_day: currentWakeDay(), scoring_version: SCORING_VERSION, ...extra,
   });
   if (!broadcastQueued) { broadcastQueued = true; queueMicrotask(() => { broadcastQueued = false; broadcast(); }); }
+  return d.getTime(); // the row's own timestamp, to the millisecond
 }
 
 // ---------- D4: other tabs on this device ----------
@@ -583,14 +593,15 @@ function openApp(appKey, actId) {
   if (Math.random() < activeMin / PROMPT_RANDOM_EVERY_MIN) queuePrompt("prompt_random");
   S.lastLaunchAt = t;
   const doomscrolling = S.doomStreak > 0 && S.doomStreak % DOOM.streak === 0;
-  log("open", before, S.level, { command: `${appKey} ${actId}`, app: appKey, activity: actId, activity_label: act.label,
+  const loggedAt = log("open", before, S.level, { command: `${appKey} ${actId}`, app: appKey, activity: actId, activity_label: act.label,
     weight: act.weight, points_added: round1(points), switch_penalty: round1(sw), check_penalty: round1(ck * mult),
     repeat_count: repeat, url });
   toast(`${appKey}: ${points > 0 ? "+" : ""}${Math.round(points)}%${sw ? " (app-switching penalty)" : ""}${ck ? " (checking loop)" : ""}${mult > 1 ? " (late night x" + mult + ": prioritise sleep)" : ""}`);
   if (actId !== "going_to_sleep") { // the time spent is costed when you come back or act again (sessions); weight 0 and no-link launches count too
-    S.session = { app: appKey, activity: actId, weight: act.weight, mult, startedAt: t, levelAtStart: S.level,
+    // startedAt is the logged row's own ts, so a tab that rebuilds this session from the server derives the same session_key
+    S.session = { app: appKey, activity: actId, weight: act.weight, mult, startedAt: loggedAt, levelAtStart: S.level,
       launchPoints: act.weight * POINTS_PER_WEIGHT * mult, device: DEVICE_ID }; // launchPoints: what a glance hands half of back
-    store.set("sessionStart_" + userId, String(t));
+    store.set("sessionStart_" + userId, String(loggedAt));
   }
   finishAction(t);
   let nudged;
