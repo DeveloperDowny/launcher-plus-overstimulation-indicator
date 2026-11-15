@@ -4,7 +4,7 @@
 // A day is a wake day: 4 AM to 4 AM local time (the same boundary the launcher uses for "first launch of the day").
 const $ = (id) => document.getElementById(id);
 const C = window.CONFIG || { SUPABASE_URL: "", SUPABASE_KEY: "", USER_IDS: [] };
-const ANALYSIS_VERSION = "1";
+const ANALYSIS_VERSION = "2"; // 2: times always 12-hour (older saves are shown fine but flagged for a redo)
 const MIN = 60000, HOUR = 60 * MIN, DAY = 24 * HOUR;
 const BANDS = [[25, "calm"], [50, "steady"], [75, "loaded"], [100, "frayed"]];
 const BAND_NAMES = BANDS.map((b) => b[1]);
@@ -24,8 +24,10 @@ const pad = (n) => String(n).padStart(2, "0");
 const dateKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const dayKeyOf = (ms) => dateKey(new Date(ms - 4 * HOUR));
 const dayStartOf = (key) => { const [y, m, d] = key.split("-").map(Number); return new Date(y, m - 1, d, 4, 0, 0).getTime(); };
-const fmtT = (ms) => new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-const fmtDay = (key) => new Date(dayStartOf(key)).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
+// always 12-hour with AM/PM, whatever the device's clock setting is
+const fmtT = (ms) => new Date(ms).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+const fmtHour = (ms) => new Date(ms).toLocaleTimeString("en-US", { hour: "numeric", hour12: true });
+const fmtDay = (key) => new Date(dayStartOf(key)).toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" });
 const fmtMin = (m) => (m == null ? "–" : m < 60 ? `${Math.round(m)} min` : `${Math.floor(m / 60)} h ${Math.round(m % 60)} min`);
 const r1 = (x) => Math.round(x * 10) / 10;
 const sum = (a, f = (x) => x) => a.reduce((s, x) => s + (f(x) || 0), 0);
@@ -443,7 +445,7 @@ function renderTimeline(a, cmp) {
   for (let t = Math.ceil(x0 / HOUR) * HOUR; t <= x1; t += HOUR) {
     const step = hours > 14 ? 2 : 1;
     if (new Date(t).getHours() % step) continue;
-    svg.append(sv("text", { x: X(t), y: H - 6, "text-anchor": "middle" }, new Date(t).toLocaleTimeString([], { hour: "numeric" })));
+    svg.append(sv("text", { x: X(t), y: H - 6, "text-anchor": "middle" }, fmtHour(t)));
     svg.append(sv("line", { x1: X(t), x2: X(t), y1: M.t + PH, y2: M.t + PH + 4, stroke: "var(--axis)" }));
   }
   // the level: area colored by band (one copy per band, clipped to its strip), then a thin line
@@ -589,7 +591,7 @@ function renderHours(a, cmp) {
     if (h.added) svg.append(sv("path", { d: roundTop(x, Y(h.added), w, Y(0) - Y(h.added)), fill: "var(--added)" }));
     if (h.removed) svg.append(sv("path", { d: roundBottom(x, Y(0), w, Y(h.removed) - Y(0)), fill: "var(--removed)" }));
     if (cmp && cmp.hours && cmp.hours[i]) svg.append(sv("line", { x1: x - 1, x2: x + w + 1, y1: Y(cmp.hours[i]), y2: Y(cmp.hours[i]), stroke: "var(--ink-2)", "stroke-width": 2 }));
-    if (i % 2 === 0) svg.append(sv("text", { x: x + w / 2, y: Ht - 6, "text-anchor": "middle" }, new Date(h.t).toLocaleTimeString([], { hour: "numeric" })));
+    if (i % 2 === 0) svg.append(sv("text", { x: x + w / 2, y: Ht - 6, "text-anchor": "middle" }, fmtHour(h.t)));
     const hitR = sv("rect", { x: M.l + i * bw, y: M.t, width: bw, height: PH, fill: "transparent", tabindex: "0" });
     const tipFor = (e) => showTip(e, (t) => {
       t.append(el("div", { class: "t" }, `${fmtT(h.t)}–${fmtT(h.t + HOUR)}`));
@@ -680,7 +682,7 @@ function renderDims(a, day) {
   const days = [...DAYS.keys()].filter((k) => k <= day).sort().slice(-7);
   const g = el("div", { class: "grid7" });
   g.append(el("div"));
-  for (const k of days) g.append(el("div", { class: "muted", style: "text-align:center" }, new Date(dayStartOf(k)).toLocaleDateString([], { weekday: "narrow" })));
+  for (const k of days) g.append(el("div", { class: "muted", style: "text-align:center" }, new Date(dayStartOf(k)).toLocaleDateString("en-US", { weekday: "narrow" })));
   for (const d of DIMENSIONS) {
     g.append(el("div", { class: "muted" }, d.name));
     for (const k of days) { const done = analysisFor(k).dims.find((x) => x.key === d.key).done; g.append(el("div", { class: "c" + (done ? " on" : ""), title: `${fmtDay(k)}: ${done ? "done" : "not done"}` }, done ? "✓" : "")); }
@@ -730,14 +732,15 @@ function render(saved) {
   renderTiles(A, cmp); renderTimeline(A, cmp); renderBandBars(A, cmp); renderDims(A, A.day); renderHours(A, cmp);
   renderApps(A); renderFeels(A); renderNudges(A); renderCompare(A, cmp);
   const mo = $("moments"); mo.replaceChildren();
-  for (const m of A.moments) { const li = el("li"); li.append(el("span", { class: "tm" }, fmtT(m.t)), m.text); mo.append(li); }
-  if (!A.moments.length) mo.append(el("li", { class: "muted" }, "Nothing stood out."));
+  const moments = keyMoments(A);
+  for (const m of moments) { const li = el("li"); li.append(el("span", { class: "tm" }, fmtT(m.t)), m.text); mo.append(li); }
+  if (!moments.length) mo.append(el("li", { class: "muted" }, "Nothing stood out."));
   // takeaways are saved with the day; a comparison line is added only when a comparison is picked
   const tk = $("takeaways"); tk.replaceChildren();
   for (const t of takeaways(A, cmp)) tk.append(el("li", {}, t));
   const pr = $("problems"); pr.replaceChildren();
   for (const p of A.problems) pr.append(el("li", {}, p));
-  $("savedNote").textContent = saved ? `Analysis saved ${new Date(saved).toLocaleString()} (computed from ${A.launches.length} launches). "Redo analysis" re-computes it from the latest data and saves over it.` : "";
+  $("savedNote").textContent = saved ? `Analysis saved ${new Date(saved).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true })} (computed from ${A.launches.length} launches). "Redo analysis" re-computes it from the latest data and saves over it.` : "";
 }
 
 // ---------- page flow ----------
