@@ -554,7 +554,9 @@ function openApp(appKey, actId) {
   if (!tapOk(`launch:${appKey}|${actId}`)) return;
   const a = INV.apps[appKey], act = INV.activities[actId];
   const url = INV.urlOverrides[`${appKey}|${actId}`] || a.url;
-  const copyMode = !!(INV.roulette && (INV.roulette.copyActivities || []).includes(actId)); // roulette "morning" mode: copy, wait, then open
+  // roulette modes that copy their own list, wait, then open the site (morning reflections, physical care)
+  const copyList = INV.roulette && INV.roulette.copyLists && INV.roulette.copyLists[actId];
+  const copyMode = !!copyList;
   if (url && !copyMode) window.open(url, "_blank", "noopener"); // must happen synchronously inside the tap; dummy launches have no url
   if (url && store.get("debugSessions")) sessionDiag = { app: appKey, at: performance.now(), hiddenAt: null };
   const t = beginAction("launch", { app: appKey, weight: act.weight });
@@ -606,8 +608,8 @@ function openApp(appKey, actId) {
   finishAction(t);
   let nudged;
   if (copyMode) {
-    openRoulette(INV.roulette.morning, "Morning reflections", false, INV.roulette.delayMs);
-    if (firstOfDay) newNudge("morning_roulette");
+    openRoulette(copyList, actId === "roulette_physical_care" ? "Physical care" : "Morning reflections", false, INV.roulette.delayMs);
+    if (firstOfDay && actId === "roulette_morning") newNudge("morning_roulette");
     nudged = true;
   } else nudged = maybeRoulette(before, S.level, doomscrolling, firstOfDay, appKey === "roulette");
   if (!nudged && before <= 50 && S.level > 50) newNudge("loaded_band");

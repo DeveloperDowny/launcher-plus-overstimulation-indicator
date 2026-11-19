@@ -41,6 +41,10 @@ ACTIVITIES = {
     "stretching":     ("Gentle stretching / yoga", -3, ["stretch", "stretching", "yoga"]),
     "sleep_audio":    ("Sleep story / bedtime audio", -3, ["sleepstory", "story"]),
     "calm_reading":   ("Familiar book, calming fiction or poetry", -2, ["fiction", "poetry", "novel", "calmread"]),
+    # Kindle: calming in every mode except learning
+    "kindle_reading": ("Reading on Kindle", -2, ["reading", "read"]),
+    "kindle_bedtime": ("Reading on Kindle before bed", -3, ["bedtime", "night", "sleep"]),
+    "kindle_learning": ("Learning from a book on Kindle", 4, ["learning", "study"]),
     "audiobook":      ("Familiar audiobook", -2, ["audiobook", "listen"]),
     "mood_checkin":   ("Simple mood check-in", -2, ["mood", "checkin"]),
     "nature_visuals": ("Calming nature photos / slow nature video", -2, ["photos", "scenery", "slow"]),
@@ -53,6 +57,7 @@ ACTIVITIES = {
     "back_to_work":   ("Going back to work", 0, ["backtowork", "resume"]),
     "roulette":       ("Spin the calming-activity roulette", 0, ["spin", "roulette"]),
     "roulette_morning": ("Roulette with the morning reflections list", 0, ["morning", "reflections"]),
+    "roulette_physical_care": ("Roulette with the physical care list", 0, ["physical", "care", "physicalcare"]),
     "clock_check":    ("Checking the clock / alarm", 0, ["clock", "alarm"]),
     "travel_log":     ("Travel log", 0, ["travel", "journey"]),
     "protein_breakfast": ("Protein breakfast", 0, ["proteinbreakfast"]),
@@ -121,7 +126,191 @@ What we do in life isn't so important. It's the way we choose to live and the wa
 
 # the first launch of the day, and the roulette "morning" mode, copy the morning list, wait this long, then open the site
 ROULETTE_DELAY_S = 1.0
-ROULETTE_COPY_ACTIVITIES = ["roulette_morning"]
+ROULETTE_PHYSICAL_CARE = """Hair care and scalp health, 1
+Hair growth and hair loss prevention, 1
+Premature greying prevention and management, 1
+Dandruff prevention and treatment, 1
+Scalp hygiene and exfoliation, 1
+Hair washing frequency and shampoo selection, 1
+Hair conditioning and moisturising, 1
+Hair oiling and its benefits, 1
+Facial skin care and cleansing, 1
+Skin moisturising and hydration, 1
+Sunscreen and UV protection, 1
+Skin exfoliation and dead skin removal, 1
+Acne prevention and treatment, 1
+Blackheads and whiteheads management, 1
+Dark circles and under-eye care, 1
+Puffiness and eye bags management, 1
+Skin pigmentation and uneven skin tone, 1
+Skin ageing and wrinkle prevention, 1
+Skin elasticity and collagen health, 1
+Lip care and lip hydration, 1
+Neck care and pigmentation, 1
+Elbow and knee skin care, 1
+Underarm hygiene and pigmentation, 1
+Back acne prevention and treatment, 1
+Body odour prevention and management, 1
+Body moisturising and hydration, 1
+Hand care and skin protection, 1
+Nail care and nail hygiene, 1
+Cuticle care, 1
+Foot hygiene and daily foot care, 1
+Foot moisturising and cracked heel prevention, 1
+Toenail care and fungal infection prevention, 1
+Foot odour prevention, 1
+Callus and corn management, 1
+Footwear selection and foot support, 1
+Eye health and vision preservation, 1
+Eye strain and digital eye fatigue prevention, 1
+Screen time and eye protection, 1
+Eye lubrication and dry eye prevention, 1
+Eye hygiene and eyelid care, 1
+Regular eye examinations, 1
+Hearing health and noise protection, 1
+Ear hygiene and earwax management, 1
+Ear infection prevention, 1
+Nose hygiene and nasal health, 1
+Sinus health and congestion management, 1
+Oral hygiene and brushing techniques, 1
+Flossing and interdental cleaning, 1
+Tongue cleaning and oral hygiene, 1
+Gum health and gingivitis prevention, 1
+Cavity prevention and dental health, 1
+Tooth sensitivity management, 1
+Teeth whitening and stain prevention, 1
+Bad breath prevention, 1
+Dental checkups and professional cleaning, 1
+Wisdom teeth and dental alignment, 1
+Jaw health and TMJ care, 1
+Neck mobility and flexibility, 1
+Neck posture and forward head posture correction, 1
+Shoulder mobility and stability, 1
+Shoulder pain prevention, 1
+Upper back health and mobility, 1
+Lower back health and mobility, 1
+Spinal alignment and posture, 1
+Spinal flexibility and mobility, 1
+Core strength and stability, 1
+Hip mobility and flexibility, 1
+Hip strength and joint health, 1
+Knee health and injury prevention, 1
+Ankle mobility and stability, 1
+Wrist mobility and flexibility, 1
+Elbow joint health, 1
+Joint mobility and flexibility, 1
+Joint pain prevention and management, 1
+Bone density and bone health, 1
+Osteoporosis prevention, 1
+Muscle strength and maintenance, 1
+Muscle recovery and soreness management, 1
+Muscle flexibility and stretching, 1
+Tendon and ligament health, 1
+Posture during sitting and working, 1
+Ergonomics and workstation setup, 1
+Walking posture and gait health, 1
+Foot arch health and flat feet management, 1
+Balance and coordination, 1
+Injury prevention and physical conditioning, 1
+Heart health and cardiovascular fitness, 1
+Blood pressure monitoring and management, 1
+Cholesterol management, 1
+Blood circulation and vascular health, 1
+Blood sugar regulation and metabolic health, 1
+Diabetes prevention and screening, 1
+Lung health and breathing capacity, 1
+Breathing techniques and respiratory health, 1
+Liver health and liver function, 1
+Kidney health and kidney function, 1
+Bladder health and urinary hygiene, 1
+Gut health and digestive wellness, 1
+Stomach health and gastric wellness, 1
+Acid reflux and heartburn management, 1
+Bloating and gas management, 1
+Constipation prevention and bowel health, 1
+Diarrhoea prevention and digestive health, 1
+Gut microbiome and beneficial bacteria, 1
+Dietary fibre and digestive health, 1
+Hydration and daily water intake, 1
+Nutritional balance and healthy eating, 1
+Protein intake and muscle maintenance, 1
+Micronutrients and vitamin requirements, 1
+Iron levels and anaemia prevention, 1
+Vitamin D and calcium management, 1
+Vitamin B12 and neurological health, 1
+Magnesium and electrolyte balance, 1
+Omega-3 intake and essential fatty acids, 1
+Food allergies and food intolerances, 1
+Food safety and food hygiene, 1
+Eating habits and mindful eating, 1
+Healthy body weight management, 1
+Metabolic rate and metabolic health, 1
+Thyroid health and hormonal regulation, 1
+Pancreatic health and insulin function, 1
+Immune system health and immunity, 1
+Lymphatic system and lymph circulation, 1
+Spleen health and immune function, 1
+Gut parasite prevention and intestinal health, 1
+Sleep quality and sleep hygiene, 1
+Sleep posture and sleeping ergonomics, 1
+Pillow and mattress selection, 1
+Circadian rhythm and sleep regulation, 1
+Daily energy levels and fatigue management, 1
+Stress management and its physical effects, 1
+Nervous system health, 1
+Brain health and cognitive function, 1
+Memory and concentration maintenance, 1
+Headache and migraine prevention, 1
+Migraine triggers and management, 1
+Dizziness and balance health, 1
+Mental fatigue and physical recovery, 1
+Hormonal health and endocrine function, 1
+Adrenal gland health and stress response, 1
+Reproductive health and fertility awareness, 1
+Testicular health and self-examination, 1
+Prostate health and preventive screening, 1
+Penile hygiene and genital skin care, 1
+Sexual health and sexual hygiene, 1
+Sexual function and erectile health, 1
+Hernia awareness and prevention, 1
+Pelvic floor strength and mobility, 1
+Perineal hygiene and care, 1
+Body hygiene and daily bathing practices, 1
+Personal hygiene and intimate-area care, 1
+Sweating and temperature regulation, 1
+Clothing hygiene and fabric selection, 1
+Laundry hygiene and skin protection, 1
+Sun exposure and vitamin D balance, 1
+Heat exposure and heat exhaustion prevention, 1
+Cold exposure and temperature management, 1
+Insect bite and mosquito bite prevention, 1
+Wound cleaning and basic first aid, 1
+Scar prevention and wound healing, 1
+Burn prevention and burn care, 1
+Fungal infection prevention, 1
+Bacterial infection prevention, 1
+Viral infection prevention, 1
+Skin infection recognition and management, 1
+Allergy prevention and management, 1
+Regular full-body health checkups, 1
+Blood tests and preventive health screening, 1
+Cancer awareness and age-appropriate screening, 1
+Vaccination and immunisation schedule, 1
+Dental preventive checkups, 1
+Vision and hearing screening, 1
+Body measurements and health tracking, 1
+Resting heart rate and cardiovascular tracking, 1
+Fitness assessment and physical performance, 1
+Daily movement and sedentary lifestyle prevention, 1
+Walking and daily step goals, 1
+Strength training and resistance exercise, 1
+Cardiovascular exercise and endurance, 1
+Mobility routines and daily stretching, 1
+Breathing and relaxation routines, 1
+Recovery days and physical rest, 1"""
+# roulette modes that copy a list, wait, then open the site: activity -> the list it copies
+ROULETTE_COPY_LISTS = {"roulette_morning": ROULETTE_MORNING_CLIPBOARD, "roulette_physical_care": ROULETTE_PHYSICAL_CARE}
+ROULETTE_COPY_ACTIVITIES = list(ROULETTE_COPY_LISTS)
 
 # streaming (OTT) apps: when the real length of a session is unknown, assume this long instead of the default 20 min
 OTT_APPS = ["netflix", "prime video", "hotstar", "sonyliv", "zee5", "mx player", "disney+", "apple tv", "hbo max", "hulu", "crunchyroll"]
@@ -194,7 +383,7 @@ APPS = {
     "substack": (["substack"], "https://substack.com/", "long_articles", ["long_articles"]),
     "wikipedia": (["wikipedia", "wiki"], "https://www.wikipedia.org/", "long_articles", ["long_articles"]),
     "scholar": (["google scholar", "scholar"], "https://scholar.google.com/", "long_articles", ["long_articles"]),
-    "kindle": (["kindle"], "https://read.amazon.com/", "long_articles", ["long_articles", "before_sleep", "calm_reading"]),
+    "kindle": (["kindle"], "https://read.amazon.com/", "kindle_reading", ["kindle_reading", "kindle_bedtime", "kindle_learning", "calm_reading"]),
     "amazon": (["amazon"], "https://www.amazon.in/", "shopping", ["shopping"]),
     "flipkart": (["flipkart"], "https://www.flipkart.com/", "shopping", ["shopping"]),
     "myntra": (["myntra"], "https://www.myntra.com/", "shopping", ["shopping"]),
@@ -266,7 +455,7 @@ APPS = {
     "paytm": (["paytm"], "https://paytm.com/", "utility_task", ["utility_task"]),
     "rapido": (["rapido"], "https://rapido.bike/", "utility_task", ["utility_task"]),
     "google maps": (["google maps", "maps"], "https://www.google.com/maps", "utility_task", ["utility_task"]),
-    "roulette": (["roulette"], ROULETTE_URL, "roulette", ["roulette", "roulette_morning"]),
+    "roulette": (["roulette"], ROULETTE_URL, "roulette", ["roulette", "roulette_morning", "roulette_physical_care"]),
     # --- dummy launches (no url: nothing opens, the event is just logged) ---
     "sleep": (["going to sleep", "go to sleep", "sleep", "bed"], "", "going_to_sleep", ["going_to_sleep"]),
     "back to work": (["going back to work", "back to work", "work"], "", "back_to_work", ["back_to_work"]),
@@ -302,7 +491,7 @@ if __name__ == "__main__":  # regenerate web/inventory.json
         "apps": {k: {"aliases": a, "url": u, "default": d, "supports": sup} for k, (a, u, d, sup) in APPS.items()},
         "urlOverrides": {f"{a}|{b}": u for (a, b), u in URL_OVERRIDES.items()},
         "roulette": {"url": ROULETTE_URL, "clipboard": ROULETTE_CLIPBOARD, "morning": ROULETTE_MORNING_CLIPBOARD,
-                     "delayMs": int(ROULETTE_DELAY_S * 1000), "copyActivities": ROULETTE_COPY_ACTIVITIES},
+                     "delayMs": int(ROULETTE_DELAY_S * 1000), "copyActivities": ROULETTE_COPY_ACTIVITIES, "copyLists": ROULETTE_COPY_LISTS},
         "doomscroll": {"activities": DOOMSCROLL_ACTIVITIES, "streak": DOOMSCROLL_STREAK},
         "nightMult": NIGHT_MULT,
         "sessionDefaultMin": {app: OTT_DEFAULT_SESSION_MIN for app in OTT_APPS},
