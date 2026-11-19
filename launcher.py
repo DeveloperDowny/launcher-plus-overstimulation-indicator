@@ -17,7 +17,7 @@ from typing import List, Optional
 
 import typer
 
-from inventory import (ACTIVITIES, APPS, DOOMSCROLL_ACTIVITIES, DOOMSCROLL_STREAK, NIGHT_MULT, ROULETTE_CLIPBOARD, ROULETTE_COPY_ACTIVITIES, ROULETTE_DELAY_S,
+from inventory import (ACTIVITIES, APPS, DOOMSCROLL_ACTIVITIES, DOOMSCROLL_STREAK, NIGHT_MULT, ROULETTE_CLIPBOARD, ROULETTE_COPY_LISTS, ROULETTE_DELAY_S,
                        ROULETTE_MORNING_CLIPBOARD, ROULETTE_URL,
                        URL_OVERRIDES)
 
@@ -160,13 +160,15 @@ def copy_to_clipboard(text: str) -> bool:
     return False
 
 
-def roulette_morning() -> None:
-    """The roulette "morning" mode: copy the morning list, wait a second, open the roulette."""
-    copied = copy_to_clipboard(ROULETTE_MORNING_CLIPBOARD)
+def roulette_copy_mode(act_id: str) -> None:
+    """A roulette mode that copies its own list (morning reflections, physical care), waits a second, opens the roulette."""
+    text = ROULETTE_COPY_LISTS[act_id]
+    copied = copy_to_clipboard(text)
     time.sleep(ROULETTE_DELAY_S)
     webbrowser.open(ROULETTE_URL)
-    typer.echo(typer.style("Morning reflections. Opening the roulette", fg="green", bold=True)
-               + (" (list copied to clipboard)." if copied else "; couldn't copy, paste this list:\n" + ROULETTE_MORNING_CLIPBOARD))
+    name = "Physical care" if act_id == "roulette_physical_care" else "Morning reflections"
+    typer.echo(typer.style(f"{name}. Opening the roulette", fg="green", bold=True)
+               + (" (list copied to clipboard)." if copied else "; couldn't copy, paste this list:\n" + text))
 
 
 def maybe_roulette(before: float, after: float, doomscrolling: bool = False, first_of_day: bool = False,
@@ -266,7 +268,7 @@ def do_open(s: dict, text: str) -> None:
         note += f" (x{mult:g} late night: prioritise sleep)"
 
     url = URL_OVERRIDES.get((app_key, act_id), APPS[app_key][1])
-    morning_mode = act_id in ROULETTE_COPY_ACTIVITIES  # roulette "morning" mode copies, waits, then opens (below)
+    morning_mode = act_id in ROULETTE_COPY_LISTS  # roulette copy modes copy their list, wait, then open (below)
     if url and not morning_mode:  # dummy launches (sleep, back to work) have no url and only log
         webbrowser.open(url)
 
@@ -281,7 +283,7 @@ def do_open(s: dict, text: str) -> None:
     typer.echo(f"{'Opening' if url else 'Logged'} {app_key}: {label} (weight {weight}) {points:+.0f}%{note}")
     typer.echo(f"Level now:\n  {status_line(s['level'], s)}")
     if morning_mode:
-        roulette_morning()
+        roulette_copy_mode(act_id)
     else:
         maybe_roulette(level_before, s["level"], doomscrolling, first_of_day, site_open=app_key == "roulette")
 

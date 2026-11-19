@@ -4,7 +4,7 @@
 // A day is a wake day: 4 AM to 4 AM local time (the same boundary the launcher uses for "first launch of the day").
 const $ = (id) => document.getElementById(id);
 const C = window.CONFIG || { SUPABASE_URL: "", SUPABASE_KEY: "", USER_IDS: [] };
-const ANALYSIS_VERSION = "2"; // 2: times always 12-hour (older saves are shown fine but flagged for a redo)
+const ANALYSIS_VERSION = "3"; // 2: times always 12-hour (older saves are shown fine but flagged for a redo)
 const MIN = 60000, HOUR = 60 * MIN, DAY = 24 * HOUR;
 const BANDS = [[25, "calm"], [50, "steady"], [75, "loaded"], [100, "frayed"]];
 const BAND_NAMES = BANDS.map((b) => b[1]);
@@ -12,7 +12,8 @@ const bandOf = (l) => BANDS.find((b) => l <= b[0])[1];
 const LATE_START = 22, LATE_END = 5; // the launcher's late-night window (stimulating launches count 1.5x)
 const DIMENSIONS = [ // checked list: what counts as done for each dimension
   { key: "mental", name: "Mental", what: "7 Habits logged", test: (o) => o.app === "7-habits", need: 1 },
-  { key: "physical", name: "Physical", what: "Surya namaskar launched", test: (o) => o.app === "surya namaskar", need: 1 },
+  { key: "physical", name: "Physical", what: "Surya namaskar logged, or Roulette physical care done",
+    test: (o) => o.app === "surya namaskar" || (o.app === "roulette" && o.activity === "roulette_physical_care"), need: 1 },
   { key: "spiritual", name: "Spiritual", what: "Bhagwat Gita launched", test: (o) => o.app === "gita a day", need: 1 },
   { key: "social", name: "Social", what: "WhatsApp trusted mode launched more than 10 times", test: (o) => o.app === "whatsapp" && o.activity === "trusted_msg", need: 11 },
 ];
@@ -136,6 +137,8 @@ function levelAt(curve, t) {
   return t1 === t0 ? v1 : v0 + ((v1 - v0) * (t - t0)) / (t1 - t0);
 }
 
+const dimsOf = (opens) => DIMENSIONS.map((d) => { const n = opens.filter(d.test).length; return { key: d.key, name: d.name, what: d.what, count: n, need: d.need, done: n >= d.need }; });
+
 function analyze(dayRows, day) {
   const start = dayStartOf(day), end = start + DAY;
   const { rows, identical, dupSessions } = dedupe(dayRows);
@@ -205,7 +208,7 @@ function analyze(dayRows, day) {
   for (const s of sessions) if (apps.has(s.app)) apps.get(s.app).minutes += s.minutes;
   const byApp = [...apps.values()].sort((a, b) => b.net - a.net || b.launches - a.launches);
 
-  const dims = DIMENSIONS.map((d) => { const n = opens.filter(d.test).length; return { key: d.key, name: d.name, what: d.what, count: n, need: d.need, done: n >= d.need }; });
+  const dims = dimsOf(opens);
 
   const s = {
     firstUse: first, lastUse: last, inProgress,
@@ -727,6 +730,7 @@ function renderCompare(a, cmp) {
 function render(saved) {
   const cmp = compareTarget($("cmp").value, A.day);
   $("report").hidden = false;
+  A.dims = dimsOf(A.launches); A.summary.dimsDone = A.dims.filter((d) => d.done).length; // current rules, even for an older save
   const s = A.summary;
   $("dayline").textContent = `${fmtDay(A.day)} · 4 AM to 4 AM · first use ${fmtT(s.firstUse)}, last ${fmtT(s.lastUse)}${s.inProgress ? " · day still in progress" : ""}${s.wake ? ` · woke ${fmtT(s.wake.t)} after ${fmtMin(s.wake.sleepMinutes)}` : ""}`;
   renderTiles(A, cmp); renderTimeline(A, cmp); renderBandBars(A, cmp); renderDims(A, A.day); renderHours(A, cmp);
